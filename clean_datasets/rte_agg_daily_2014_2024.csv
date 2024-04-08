@@ -1,4 +1,4 @@
-Consommation,Prévision J-1,Prévision J,Fioul,Charbon,Gaz,Nucléaire,Eolien,Solaire,Hydraulique,Pompage,Bioénergies,Ech. physiques,Taux de Co2,Ech_comm
+Consommation,Prévision_J-1,Prévision_J,Fioul,Charbon,Gaz,Nucléaire,Eolien,Solaire,Hydraulique,Pompage,Bioénergies,Ech_physiques,Taux_de_Co2,Ech_comm
 1613817.0,1569650.0,1603950.0,7666.5,28191.5,56216.0,1388930.5,51127.0,11370.5,158136.5,-26906.5,21712.5,-82623.5,1028.0,-76107.0
 1656045.5,1672200.0,1643050.0,7796.5,43440.5,62653.5,1400287.0,78933.0,8297.5,180503.0,-17687.5,21602.5,-129775.5,1196.0,-121458.0
 1538261.0,1543750.0,1528950.0,7723.0,34074.0,54482.0,1376450.5,105299.0,5860.5,141242.5,-32067.0,21850.0,-176653.5,1086.0,-168566.0
