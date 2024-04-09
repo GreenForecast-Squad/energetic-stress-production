@@ -77,7 +77,7 @@ if __name__ == '__main__':
     permutation = np.random.permutation(x.shape[0])
     x_train, x_test = x[permutation[:int(len(permutation) * 0.8)], :], x[permutation[int(len(permutation) * 0.8):], :]
     y_train, y_test = y[permutation[:int(len(permutation) * 0.8)], :], y[permutation[int(len(permutation) * 0.8):], :]
-    model.fit(x_train, y_train, validation_data=(x_test, y_test))
+    model.fit(x_train, y_train, validation_data=(x_test, y_test), batch_size=4, epochs=10)
 
     # @tf.function
     # def train_step(data):
