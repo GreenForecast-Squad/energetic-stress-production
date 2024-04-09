@@ -60,7 +60,7 @@ def get_training_data(batch_ds, df_rte, arpege_data, rte_features, rte_target):
 
 def get_model():
     return models.Sequential([
-        layers.Dense(64),
+        layers.Dense(32),
         layers.Dense(4)
     ])
 
@@ -69,15 +69,17 @@ def get_model():
 if __name__ == '__main__':
     model = get_model()
     model_optimizer = tf.optimizers.Adam(learning_rate=0.001, beta_1=0.95, weight_decay=2. * 1e-5)
-    model.compile(model_optimizer, loss='mse')
+    model.compile(model_optimizer, loss='mae')
     df_rte, arpege_data = get_dataset()
     v_dates = np.array(get_valid_dates(df_rte, arpege_data))
-    x, y = get_training_data(v_dates, df_rte, arpege_data, ['Prévision_J-1'], 'Fossile')
+    x, y = get_training_data(v_dates, df_rte, arpege_data, ['Prévision_J-1', 'Consommation', ''], 'Fossile')
     batch_size = 4
     permutation = np.random.permutation(x.shape[0])
     x_train, x_test = x[permutation[:int(len(permutation) * 0.8)], :], x[permutation[int(len(permutation) * 0.8):], :]
     y_train, y_test = y[permutation[:int(len(permutation) * 0.8)], :], y[permutation[int(len(permutation) * 0.8):], :]
-    model.fit(x_train, y_train, validation_data=(x_test, y_test), batch_size=4, epochs=32)
+    model.fit(x_train, y_train, validation_data=(x_test, y_test), batch_size=4, epochs=4)
+    pred_test = model.predict(x_test)
+    print([np.corrcoef(pred_test[:, i], y_test[:, i])[1, 0] for i in range(4)])
 
     # @tf.function
     # def train_step(data):
