@@ -24,14 +24,14 @@ HORIZONS_SLICES = {
 FRANCE_GEOJSON = 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/metropole.geojson'
 
 
-def get_path(date):
-    return f"tmp_data/{date.strftime('%Y%m%d')}.grib"
+def get_path(date, horizon):
+    return f"tmp_data/{date.strftime('%Y%m%d')}{horizon}.grib"
 
 
 def download_arpege(date: datetime, horizon):
-    path = get_path(date)
+    path = get_path(date, horizon)
     if os.path.exists(path):
-        return True
+        return path
     url = BASE_URL.format(
         date=date.strftime(DATE_FMT), params='SP1', horizons=horizon
     )
@@ -83,18 +83,37 @@ def get_daily_data(year, month, day, mask):
     return daily_data
 
 
+def get_monthly_path(year, month):
+    return f'tmp_data/{year}_{month}.npy'
+
+
 def build_monthly_data(year, month):
     mask = get_mask()
     _, max_day = monthrange(year, month)
     monthly_data = np.stack([get_daily_data(year, month, day, mask) for day in tqdm(range(1, max_day + 1))], axis=0)
-    np.save(f'tmp_data/{year}_{month}.npy', monthly_data)
+    np.save(get_monthly_path(year, month), monthly_data)
+    return True
+
+
+def get_dataset_path():
+    return 'tmp_data/arpege_data.npz'
+
+
+def build_dataset(years_months):
+    data = np.concatenate([np.load(get_monthly_path(year, month)) for year, month in years_months], axis=0)
+    dates = np.array([
+        datetime(year, month, d) for year, month in years_months for d in range(1, monthrange(year, month)[1] + 1)
+    ])
+    lead_times = np.arange(N_HORIZONS) * 3
+    dataset = {'data': data, 'dates': dates, 'lead_times': lead_times}
+    np.savez_compressed(get_dataset_path(), **dataset)
     return True
 
 
 if __name__ == '__main__':
-    # y_m = [(2022, m) for m in range(3, 13)]
-    # y_m.extend([(2023, m) for m in range(1, 13)])
-    y_m = [(2024, m) for m in range(1, 5)]
+    y_m = [(2022, m) for m in range(3, 13)]
+    y_m.extend([(2023, m) for m in range(1, 13)])
+    y_m.extend([(2024, m) for m in range(1, 5)])
     for y, m in y_m:
         print(y, m)
         build_monthly_data(y, m)
