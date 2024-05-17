@@ -2,9 +2,9 @@ import os
 
 import pandas as pd
 
-in_relative_path = "../energetic-stress-production/raw_datasets/tempo/"
+in_relative_path = "../energetic-stress-production/data/bronze/tempo/"
 in_absolute_path = os.path.abspath(os.path.join(os.getcwd(), in_relative_path))
-out_relative_path = "../energetic-stress-production/clean_datasets/"
+out_relative_path = "../energetic-stress-production/data/silver/tempo_2014_2024.csv"
 out_absolute_path = os.path.abspath(os.path.join(os.getcwd(), out_relative_path))
 
 
@@ -26,7 +26,8 @@ def join_data(paths: list) -> pd.DataFrame:
 
 def write_data(data: pd.DataFrame):
     data = data.rename(columns={"Type de jour TEMPO": "type_tempo"})
-    data.to_csv(f"{out_absolute_path}/tempo_2014_2024.csv", index=False)
+    print(f"Wrtting data to '{out_absolute_path}'...")
+    data.to_csv(out_absolute_path, index=False)
 
 
 def __init__():
