@@ -1,6 +1,10 @@
 """This script is an adaptation of the notebook 0_grib_to_xarray.ipynb
 
-Use it to run the ETL of all the data from the ARPEGE model."""
+Use it to run the ETL of all the data from the ARPEGE model.
+
+To run this, you need to have the archives of the ARPEGE model. Only Antoine has access to it.
+Hence, you cannot actually run this script.
+"""
 import os
 from multiprocessing import freeze_support
 from pathlib import Path
