@@ -1,5 +1,6 @@
 import os
 
+import numpy as np
 import pandas as pd
 
 pd.options.mode.copy_on_write = True
@@ -46,7 +47,7 @@ list_exchange_cols = [
 ]
 
 # GroupBy
-groupby = ["Date", "type_tempo"]
+groupby = ["Date", "Nature", "type_tempo"]
 column_aggregations = {
     "Consommation": "sum",
     "Prévision_J-1": "sum",
@@ -79,34 +80,35 @@ def transform_rte(rte_df: pd.DataFrame) -> pd.DataFrame:
             rte_df[col] = rte_df[col].replace("ND", None).astype(float)
     rte_df["Ech_comm"] = rte_df[list_exchange_cols].sum(axis=1)
 
-    # Clean columns name
     rte_df.columns = rte_df.columns.str.replace(" ", "_")
     rte_df.columns = rte_df.columns.str.replace(".", "")
-
     return rte_df
 
 
 def groupby_daily(rte_df):
     """
     Groupby rte_df by date & type_tempo - sum all others columns
-    All sums are divided by two because we have to values per hour
+    For 'Données consolidées' and 'Données définitives' we have
+    a point every 30min => we have to divide by 2
+    for 'Données temps réel' we have a point every 15 min
+    => we have to divide by 4
 
     :param rte_df: _description_
     """
     rte_daily_df = rte_df.groupby(groupby).agg(column_aggregations).reset_index()
-    # rte_daily_df["Prévision_J-1"] = rte_daily_df["Prévision_J-1"].astype(float)
     for col in set(rte_daily_df.columns) - set(groupby):
+        rte_daily_df[col] = np.where(
+            rte_daily_df["Nature"] == "Données temps réel",
+            rte_daily_df[col] / 4,
+            rte_daily_df[col] / 2,
+        )
         rte_daily_df[col] = rte_daily_df[col].astype(float) / 2
-
     return rte_daily_df
 
 
 def merge_rte_solar_wind(rte_daily_df: pd.DataFrame, solar_wind_df: pd.DataFrame):
     rte_daily_df["Date"] = pd.to_datetime(rte_daily_df["Date"])
     solar_wind_df["Date"] = pd.to_datetime(solar_wind_df["Date"])
-
-    # print(rte_daily_df.dtypes)
-    # print(solar_wind_df.dtypes)
     return pd.merge(rte_daily_df, solar_wind_df, on="Date", how="left")
 
 
