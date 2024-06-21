@@ -10,7 +10,7 @@ This will download the data and display the dashboard in the browser.
 """
 from taipy.gui import Gui
 import taipy.gui.builder as tgb
-from meteo import ArpegeSimpleAPI
+from energy_forecast.meteo import ArpegeSimpleAPI
 import pandas as pd
 
 
@@ -88,7 +88,7 @@ with tgb.Page() as page_pv:
               )
 
 def compute_energy():
-    from energy import RTESimpleAPI
+    from energy_forecast.energy import RTESimpleAPI
     r = RTESimpleAPI()
     r.download()
     energy =  r.read_file()
