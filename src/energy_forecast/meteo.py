@@ -110,7 +110,10 @@ class ArpegeSimpleAPI():
         da_sun_france = da_sun.sel(
         longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
         )
-        da_sun_region = da_sun_france.groupby(self.masks).mean(["latitude", "longitude"])
+        try :
+            da_sun_region = da_sun_france.groupby(self.masks).mean(["latitude", "longitude"])
+        except ValueError:
+            da_sun_region = da_sun_france.groupby(self.masks).mean("stacked_longitude_latitude")
         # relabel the regions groups
         da_sun_region["group"] = self.regions_names
         # change the name of the groups
@@ -133,7 +136,10 @@ class ArpegeSimpleAPI():
         da_wind_france = da_wind.sel(
         longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
         )
-        da_wind_region = da_wind_france.groupby(self.masks).mean(["latitude", "longitude"])
+        try :
+            da_wind_region = da_wind_france.groupby(self.masks).mean(["latitude", "longitude"])
+        except ValueError:
+            da_wind_region = da_wind_france.groupby(self.masks).mean("stacked_longitude_latitude")
         # relabel the regions groups
         da_wind_region["group"] = self.regions_names
         # change the name of the groups
