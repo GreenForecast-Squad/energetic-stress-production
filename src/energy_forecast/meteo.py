@@ -24,10 +24,10 @@ KEYS_FILTER_T2M = {
 }
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-WEATHER_DIR = PROJECT_ROOT / "notebooks" / "weather"
-bounds_file = WEATHER_DIR / "france_bounds.yml"
-region_name_file = WEATHER_DIR / "regions.yml"
-region_mask_file = WEATHER_DIR / "mask_france_regions.nc"
+GEO_DIR = PROJECT_ROOT / "data" / "geo"
+bounds_file = GEO_DIR / "france_bounds.yml"
+region_name_file = GEO_DIR / "regions_name.yml"
+region_mask_file = GEO_DIR / "mask_france_regions.nc"
 
 
 class ArpegeSimpleAPI():

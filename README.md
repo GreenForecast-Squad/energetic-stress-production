@@ -33,7 +33,15 @@ A website will be created to display the forecast.
 
 ## Installation
 
-We need [hatch](https://hatch.pypa.io) to manage the project.
+We use [hatch](https://hatch.pypa.io) to manage the project.
+
+There is [a bug](https://github.com/ecmwf/eccodes-python/issues/88) in the current version of `eccodes`, failing the installation.
+Installing with `conda` first solved the issue for me.
+
+Run the following commands to check if `eccodes` is installed:
+```bash
+python -m eccodes selfcheck
+```
 
 ### Interactive mode
 
