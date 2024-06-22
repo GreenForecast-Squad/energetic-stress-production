@@ -30,8 +30,11 @@ dependencies = [
   "xarray",
   "scikit-learn",
   "matplotlib",
+  "eccodes",
   "cfgrib",
-  # "statsmodels",
+  "requests",
+  "pyyaml",
+  "statsmodels",
 
 ]
 

@@ -30,13 +30,33 @@ def compute_data_wind()->pd.Series:
     return data
 
 def compute_data_pv_power(data_sun: pd.Series)->pd.Series:
-    pv_power = data_sun.copy()
-    pv_power["pv_power"] = pv_power["sun_flux"] * 1e-3 / 3
+    sun_data = ArpegeSimpleAPI().region_sun()
+    sun_data.columns = [
+        c.replace(" ", "_").replace("'", "_").replace("-", "_").lower()
+        for c in sun_data.columns
+    ]
+    model_params = pd.read_csv("notebooks/datascience/sun_model_2_params.csv")
+    model_params.columns = ["region", "coef"]
+    model_params_ser = model_params.set_index("region").iloc[:, 0]
+    production = sun_data * model_params_ser
+    pv_power = production.sum(axis=1).to_frame()
+    pv_power.reset_index(inplace=True)
+    pv_power.columns = ["time", "pv_power"]
     return pv_power
 
 def compute_data_eolien(data_wind: pd.Series)->pd.Series:
-    eolien_power = data_wind.copy()
-    eolien_power["eolien_power"] = eolien_power["wind_speed"] *100
+    wind_data = ArpegeSimpleAPI().region_wind()
+    wind_data.columns = [
+        c.replace(" ", "_").replace("'", "_").replace("-", "_").lower()
+        for c in wind_data.columns
+    ]
+    model_params = pd.read_csv("notebooks/datascience/wind_model_2_params.csv")
+    model_params.columns = ["region", "coef"]
+    model_params_ser = model_params.set_index("region").iloc[:, 0]
+    production = wind_data * model_params_ser
+    eolien_power = production.sum(axis=1).to_frame()
+    eolien_power.reset_index(inplace=True)
+    eolien_power.columns = ["time", "eolien_power"]
     return eolien_power
 
 data_sun = compute_data_sun()
@@ -94,7 +114,7 @@ def compute_energy():
     energy =  r.read_file()
 
     energy = energy[["Eolien", "Solaire"]]
-    energy = energy["2024-06-10":]
+    energy = energy["2024-06-17":]
     energy.index = energy.index.tz_localize("Europe/Paris").tz_convert("UTC").tz_localize(None)
     energy = pd.concat([
         energy,
@@ -124,9 +144,9 @@ with tgb.Page() as page_energy:
 pages = {
     "/": root_page,
     "Sun_Flux": page_sun,
-    "Wind_Speed": page_wind,
-    "PV_Power": page_pv,
-    "Energy": page_energy,
+    # "Wind_Speed": page_wind,
+    # "PV_Power": page_pv,
+    # "Energy": page_energy,
 }
 
 if __name__ == "__main__":
