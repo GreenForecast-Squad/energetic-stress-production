@@ -19,8 +19,8 @@ class RTESimpleAPI:
     def download(self):
         """Download the zip file if not already downloaded."""
 
-        if self.filename.exists():
-            time = self.filename.stat().st_mtime
+        if self.filename_xls.exists():
+            time = self.filename_xls.stat().st_mtime
             time = pd.Timestamp(time, unit="s")
             now = pd.Timestamp("now")
             if time + pd.Timedelta(self.cache_validation_time) > now:
@@ -32,7 +32,7 @@ class RTESimpleAPI:
         response.raise_for_status()
         with open(self.filename, "wb") as f:
             f.write(response.content)
-        self.unzip
+        self.unzip()
         return
 
     def unzip(self):
@@ -57,6 +57,7 @@ class RTESimpleAPI:
         data["Date"] = pd.to_datetime(data["Date"], format="%Y-%m-%d")
         data["Heures"] = pd.to_timedelta(data["Heures"] + ":00")
         data["time"] = data["Date"] + data["Heures"]
+        print(data.tail())
         return data.set_index("time")
 
 if __name__ == "__main__":
