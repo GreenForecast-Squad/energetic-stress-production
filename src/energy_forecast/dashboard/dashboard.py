@@ -39,7 +39,7 @@ def compute_data_pv_power(data_sun: pd.Series)->pd.Series:
     model_params.columns = ["region", "coef"]
     model_params_ser = model_params.set_index("region").iloc[:, 0]
     production = sun_data * model_params_ser
-    pv_power = production.sum(axis=1).to_frame()
+    pv_power = production.sum(axis=1).to_frame() / 24
     pv_power.reset_index(inplace=True)
     pv_power.columns = ["time", "pv_power"]
     return pv_power
@@ -54,7 +54,7 @@ def compute_data_eolien(data_wind: pd.Series)->pd.Series:
     model_params.columns = ["region", "coef"]
     model_params_ser = model_params.set_index("region").iloc[:, 0]
     production = wind_data * model_params_ser
-    eolien_power = production.sum(axis=1).to_frame()
+    eolien_power = production.sum(axis=1).to_frame() / 24
     eolien_power.reset_index(inplace=True)
     eolien_power.columns = ["time", "eolien_power"]
     return eolien_power
@@ -130,7 +130,7 @@ with tgb.Page() as page_energy:
     tgb.text(value="Energy" , mode="md")
     tgb.chart(data="{energy}",
               type="line",
-              title="PV Power",
+              title="ENR Production and Prediction",
               y__2="Eolien",
               y__1="Solaire",
               y__3="PV Prediction",
@@ -138,15 +138,15 @@ with tgb.Page() as page_energy:
               x="time",
             #   color="red",
             xaxis={"title":"Time"},
-            yaxis={"title":"PV Power (kW)"}
+            yaxis={"title":"Power (kW)"}
               )
 
 pages = {
     "/": root_page,
     "Sun_Flux": page_sun,
-    # "Wind_Speed": page_wind,
-    # "PV_Power": page_pv,
-    # "Energy": page_energy,
+    "Wind_Speed": page_wind,
+    "PV_Power": page_pv,
+    "Prediction": page_energy,
 }
 
 if __name__ == "__main__":
