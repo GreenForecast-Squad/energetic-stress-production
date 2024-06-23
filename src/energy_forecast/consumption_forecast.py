@@ -23,21 +23,11 @@ class DayForecast(TypedDict):
 class PredictionForecast(TypedDict):
     weekly_forecasts: list[DayForecast]
 
-class PredictionForecastAPI:
-    """Access the RTE API to get the weekly forecast of consumption."""
 
+class RTEAPROAuth2:
     url_token = "https://digital.iservices.rte-france.com/token/oauth/"
-    url_api = "https://digital.iservices.rte-france.com/open_api/consumption/v1/weekly_forecasts"
+
     def __init__(self, secret):
-        """Initialize the API with the secret.
-
-        Parameters
-        ----------
-        secret : str
-            The Base64 encoded secret to access the API.
-            See the documentation of the API to get the secret.
-
-        """
         self.secret = secret
         self.token = None
         self.token_type = None
@@ -60,11 +50,21 @@ class PredictionForecastAPI:
         self.token_type = req.json()["token_type"]
         self.token_expires_in = req.json()["expires_in"]
         self.token_expires_at = pd.Timestamp("now") + pd.Timedelta(self.token_expires_in, unit="s")
-
+        self.headers: dict[str, str] = {
+            "Host": "digital.iservices.rte-france.com",
+            "Authorization": "Bearer {}".format(self.token),
+        }
     def check_token(self):
         """Check if the token is still valid. If not, get a new one."""
-        if self.token_expires_at < pd.Timestamp("now"):
+        if self.token_expires_at - pd.Timestamp("now") < pd.Timedelta(10, unit="s"):
             self.get_token()
+
+
+
+class PredictionForecastAPI(RTEAPROAuth2):
+    """Access the RTE API to get the weekly forecast of consumption."""
+
+    url_api = "https://digital.iservices.rte-france.com/open_api/consumption/v1/weekly_forecasts"
 
     def get_raw_data(self, start_date, end_date=None, horizon="1w") -> PredictionForecast:
         """Retrieve the raw data from the API.
@@ -91,16 +91,13 @@ class PredictionForecastAPI:
             end_date = start_date + pd.Timedelta(horizon)
         else:
             end_date = pd.Timestamp(end_date)
-        headers = {
-            "Host": "digital.iservices.rte-france.com",
-            "Authorization": "Bearer {}".format(self.token),
-        }
+
         params = {
             "start_date": start_date.strftime("%Y-%m-%dT00:00:00+02:00"),
             "end_date": end_date.strftime("%Y-%m-%dT00:00:00+02:00"),
         }
         req = requests.get(self.url_api,
-                           headers=headers,
+                           headers=self.headers,
                            params=params)
         req.raise_for_status()
         return req.json()

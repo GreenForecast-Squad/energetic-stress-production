@@ -44,7 +44,7 @@ Issues = "https://github.com/GreenForecast-Squad/energetic-stress-production/iss
 Source = "https://github.com/GreenForecast-Squad/energetic-stress-production"
 
 [tool.hatch.version]
-path = "src/energy_forecast/__about__.py"
+path = "src/energy_forecast/__init__.py"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
@@ -52,6 +52,18 @@ extra-dependencies = [
 ]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/energy_forecast tests}"
+
+[tool.hatch.envs.docs]
+extra-dependencies = [
+  "sphinx",
+  "pydata-sphinx-theme",
+  "sphinx-gallery",
+  "sphinx_design",
+  "nbsphinx",
+  "taipy",
+]
+[tool.hatch.envs.docs.scripts]
+build = "sphinx-build -b html doc/ doc/_build"
 
 [tool.hatch.envs.serve]
 extra-dependencies = [

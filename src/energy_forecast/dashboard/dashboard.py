@@ -11,8 +11,12 @@ This will download the data and display the dashboard in the browser.
 from taipy.gui import Gui
 import taipy.gui.builder as tgb
 from energy_forecast.meteo import ArpegeSimpleAPI
+from energy_forecast.energy import ECO2MixDownloader
+from energy_forecast.consumption_forecast import PredictionForecastAPI
 import pandas as pd
+from pathlib import Path
 
+ROOT_DIR = Path(__file__).parent.parent.parent.parent
 
 def compute_data_sun()->pd.Series:
     sun_data = ArpegeSimpleAPI().region_sun()
@@ -108,8 +112,7 @@ with tgb.Page() as page_pv:
               )
 
 def compute_energy():
-    from energy_forecast.energy import RTESimpleAPI
-    r = RTESimpleAPI()
+    r = ECO2MixDownloader(year=2024)
     r.download()
     energy =  r.read_file()
 
@@ -141,17 +144,39 @@ with tgb.Page() as page_energy:
             yaxis={"title":"Power (kW)"}
               )
 
+env_file = ROOT_DIR / ".env"
+with env_file.open("r") as f:
+    secret = f.readline().strip().split("=", 1)[1]
+
+consumption_forecast_api = PredictionForecastAPI(secret=secret)
+consumption_forecast = consumption_forecast_api.get_weekly_forecast(
+    start_date=pd.Timestamp.now().date()
+)
+
+with tgb.Page() as page_consumption:
+    tgb.text(value="Consumption" , mode="md")
+    tgb.chart(data="{consumption_forecast.reset_index()}",
+              type="line",
+              title="Consumption Forecast",
+              y="predicted_consumption",
+              x="time",
+            #   color="red",
+            xaxis={"title":"Time"},
+            yaxis={"title":"Consumption (MW)"}
+              )
+
 pages = {
     "/": root_page,
     "Sun_Flux": page_sun,
     "Wind_Speed": page_wind,
     "PV_Power": page_pv,
     "Prediction": page_energy,
+    "Consumption": page_consumption,
 }
 
 if __name__ == "__main__":
     Gui(pages=pages).run(
-        title="Dynamic chart",
-        debug=True,
+        title="Energetic Stress Production",
+        # debug=True,
         use_reloader=True,
         )
