@@ -23,7 +23,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt install pandoc
-          sudo apt install hatch
+          sudo apt install pipx
+          pipx install hatch
       - name: sphinx build
         run: |
           hatch run docs:build
