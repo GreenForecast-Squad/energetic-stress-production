@@ -40,7 +40,7 @@ rst_prolog="""
 
 html_theme = "pydata_sphinx_theme"
 html_theme_options = {
-    "gitlab_url": "https://gitlab.ecoco2.com/recherche/computation_toolbox",
+    "github_url": "https://github.com/GreenForecast-Squad/energetic-stress-production",
     "announcement": f"<p>Last version is v{version}</p>",
 }
 html_static_path = ['_static']
@@ -51,7 +51,7 @@ html_sidebars = {
 # If true, '()' will be appended to :func: etc. cross-reference text.
 add_function_parentheses = False
 
-html_title = f"{project} v{version} Manual"
+html_title = f"{project} v{version}"
 
 
 # -- nbsphinx extension configuration ------------------------------------------

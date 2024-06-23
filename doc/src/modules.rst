@@ -1,5 +1,5 @@
-energy_forecast
-===============
+API reference
+=============
 
 .. toctree::
    :maxdepth: 4
