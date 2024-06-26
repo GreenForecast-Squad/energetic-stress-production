@@ -74,7 +74,7 @@ extra-dependencies = [
 ]
 
 [tool.hatch.envs.serve.scripts]
-prod = "streamlit run src/energy_forecast/dashboard/dashboard_streamlit.py"
+prod = "streamlit run --server.port 8502 --server.baseUrlPath energy_forecast  src/energy_forecast/dashboard/dashboard_streamlit.py"
 
 [tool.coverage.run]
 source_pkgs = ["energy_forecast", "tests"]
