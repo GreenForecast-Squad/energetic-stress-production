@@ -28,6 +28,8 @@ dependencies = [
   "numpy>=1.25.0,<2.0.0",  # numpy 2.0.0 is released but not yet supported by all dependencies
   "pandas",
   "xarray",
+  "netCDF4",
+  "watchfiles",
   "scikit-learn",
   "matplotlib",
   "eccodes",
@@ -61,17 +63,18 @@ extra-dependencies = [
   "sphinx_design",
   "nbsphinx",
   "taipy",
+  "streamlit",
 ]
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html doc/ doc/_build"
 
 [tool.hatch.envs.serve]
 extra-dependencies = [
-  "taipy",
+  "streamlit",
 ]
 
 [tool.hatch.envs.serve.scripts]
-prod = "python src/energy_forecast/dashboard/dashboard.py"
+prod = "streamlit run src/energy_forecast/dashboard/dashboard_streamlit.py"
 
 [tool.coverage.run]
 source_pkgs = ["energy_forecast", "tests"]
