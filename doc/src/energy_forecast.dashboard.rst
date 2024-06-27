@@ -7,7 +7,8 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   energy_forecast.dashboard.dashboard
+   energy_forecast.dashboard.dashboard_streamlit
+   energy_forecast.dashboard.pages
 
 Module contents
 ---------------

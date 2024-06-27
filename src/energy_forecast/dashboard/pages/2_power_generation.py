@@ -1,4 +1,5 @@
 from energy_forecast.energy import ECO2MixDownloader
+from energy_forecast import ROOT_DIR
 from energy_forecast.meteo import ArpegeSimpleAPI
 from energy_forecast.consumption_forecast import PredictionForecastAPI
 import pandas as pd
@@ -12,7 +13,7 @@ def compute_data_pv_power()->pd.Series:
         c.replace(" ", "_").replace("'", "_").replace("-", "_").lower()
         for c in sun_data.columns
     ]
-    model_params = pd.read_csv("notebooks/datascience/sun_model_2_params.csv")
+    model_params = pd.read_csv(ROOT_DIR / "data/silver/sun_model_2_params.csv")
     model_params.columns = ["region", "coef"]
     model_params_ser = model_params.set_index("region").iloc[:, 0]
     production = sun_data * model_params_ser
@@ -27,7 +28,7 @@ def compute_data_eolien()->pd.Series:
         c.replace(" ", "_").replace("'", "_").replace("-", "_").lower()
         for c in wind_data.columns
     ]
-    model_params = pd.read_csv("notebooks/datascience/wind_model_2_params.csv")
+    model_params = pd.read_csv(ROOT_DIR / "data/silver/wind_model_2_params.csv")
     model_params.columns = ["region", "coef"]
     model_params_ser = model_params.set_index("region").iloc[:, 0]
     production = wind_data * model_params_ser
