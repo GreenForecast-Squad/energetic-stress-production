@@ -4,6 +4,7 @@ import xarray as xr
 import requests
 import yaml
 import logging
+from joblib import Memory
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +32,27 @@ region_mask_file = GEO_DIR / "mask_france_regions.nc"
 
 
 class ArpegeSimpleAPI():
+    """Uses the `meteo.data.gouv.fr <https://meteo.data.gouv.fr>`_ API to fetch weather forecast data.
+
+    It downloads the data in the format GRIB2 and reads it using xarray.
+    If the file is already downloaded, it will not download it again.
+
+    Parameters
+    ----------
+    date : str, optional
+        the date at which the weather forecast was computed.
+        Must be a valid date format, e.g. ``"YYYY-MM-DD"``
+        Default is the current date.
+    time : str, optional
+        the time at which the weather forecast was computed.
+        Can be ``"00:00:00"``, ``"06:00:00"``, ``"12:00:00"``, or ``"18:00:00"``
+        Default is ``"00:00:00"``
+    prefix : str, optional
+        the prefix where the files are downloaded.
+        Used to avoid downloading the same file multiple times.
+        Default is ``"/tmp/arpege"``
+    """
+
     base_url = "https://object.data.gouv.fr/meteofrance-pnt/pnt/{date}T{time}Z/arpege/01/SP1/arpege__{resolution}__SP1__{forecast}__{date}T{time}Z.grib2"
     forecast_horizons = ["000H012H",
                          "013H024H",
@@ -38,6 +60,9 @@ class ArpegeSimpleAPI():
                          "037H048H",
                          "049H060H",
                          "061H072H",
+                         "073H084H",
+                         "085H096H",
+                         "097H102H",
                          ]
     resolution = "01"
 
@@ -59,15 +84,25 @@ class ArpegeSimpleAPI():
         self.masks = xr.load_dataarray(region_mask_file)
 
     def get_url(self, forecast_horizon):
+        """Format the URL to fetch the data."""
         return self.base_url.format(date=self.date,
                                     time=self.time,
                                     resolution=self.resolution,
                                     forecast=forecast_horizon)
 
     def get_filename(self, forecast_horizon):
+        """Format the filename to save the data."""
         return f"{self.prefix}/arpege_{self.resolution}_{self.date}_{self.time}_{forecast_horizon}.grib2"
 
     def fetch(self):
+        """Download the data from the API and save it in the prefix folder.
+        All the forecast horizons are downloaded.
+
+        Returns
+        -------
+        list[Path]
+            The list of the files downloaded.
+        """
         list_files = []
         for forecast_horizon in self.forecast_horizons:
             logger.debug(f"Fetching {forecast_horizon}")
@@ -85,27 +120,77 @@ class ArpegeSimpleAPI():
 
         return list_files
 
-    def read_file_as_xarray(self, filename, keys_filter):
+    @staticmethod
+    def read_file_as_xarray(filename, keys_filter):
+        """Open the file as an xarray dataset.
+
+        Parameters
+        ----------
+        filename : str
+            the filename of the file to open.
+        keys_filter : dict
+            the keys to filter the data.
+
+        Returns
+        -------
+        xr.Dataset
+            the dataset containing the weather forecast data.
+        """
         return xr.open_dataset(filename,
                                engine="cfgrib",
                                backend_kwargs={"filter_by_keys": keys_filter},
                                )
 
     def read_files_as_xarray(self, list_files, keys_filter):
+        """Read all the files as an xarray dataset and concatenate them along the step dimension.
+
+        Parameters
+        ----------
+        list_files : list[str]
+            the list of the files to open.
+        keys_filter : dict
+            the keys to filter the data.
+
+        Returns
+        -------
+        xr.Dataset
+            the dataset containing the weather forecast data.
+        """
         list_xr = []
         for filename in list_files:
             list_xr.append(self.read_file_as_xarray(filename, keys_filter))
         return xr.concat(list_xr, dim="step")
 
     def read_sspd(self):
+        """Fetch the data and read the solar radiation.
+
+        Returns
+        -------
+        xr.Dataset
+            the dataset containing the solar radiation data.
+        """
         list_files = self.fetch()
         return self.read_files_as_xarray(list_files, KEYS_FILTER_SSPD)
 
     def read_wind(self):
+        """Fetch the data and read the wind speed.
+
+        Returns
+        -------
+        xr.Dataset
+            the dataset containing the wind speed data.
+        """
         list_files = self.fetch()
         return self.read_files_as_xarray(list_files, KEYS_FILTER_WIND)
 
     def region_sun(self):
+        """Compute the mean sun flux for each region of France.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean sun flux for each region of France.
+        """
         da_sun = self.read_sspd().ssrd
         da_sun_france = da_sun.sel(
         longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
@@ -132,6 +217,13 @@ class ArpegeSimpleAPI():
         return df_instant_flux
 
     def region_wind(self):
+        """Compute the mean wind speed for each region of France.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean wind speed for each region of France.
+        """
         da_wind = self.read_wind().si10
         da_wind_france = da_wind.sel(
         longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
@@ -150,3 +242,95 @@ class ArpegeSimpleAPI():
         df_unstacked = df_wind_regions["si10"].unstack("region")
 
         return df_unstacked
+
+
+
+memory = Memory("/tmp/cache/energy_forecast", verbose=0)
+
+@memory.cache
+def get_region_sun(date: str)->pd.DataFrame:
+    """Retrun the mean sun flux for each hour of the day.
+
+    This is a simple wrapper around :py:meth:`ArpegeSimpleAPI.region_sun`.
+    Solar radiation is in W/m^2.
+
+    .. note::
+        The function is cached to avoid multiple computation for the same date.
+        The cache is persistent (saved on the disk at ``/tmp/cache/energy_forecast``)
+
+    Parameters
+    ----------
+    date : str
+        the date at which the weather forecast is requested.
+        Must be a valid date format, e.g. ``"YYYY-MM-DD"``
+        or a ``datetime.date`` object.
+
+    Returns
+    -------
+    pd.DataFrame
+        The mean sun flux for each hour of the day.
+        The index is a DatetimeIndex and the columns are the regions of France:
+
+        - ``"Île-de-France"``
+        - ``"Centre-Val de Loire"``
+        - ``"Bourgogne-Franche-Comté"``
+        - ``"Normandie"``
+        - ``"Hauts-de-France"``
+        - ``"Grand Est"``
+        - ``"Pays de la Loire"``
+        - ``"Bretagne"``
+        - ``"Nouvelle-Aquitaine"``
+        - ``"Occitanie"``
+        - ``"Auvergne-Rhône-Alpes"``
+        - ``"Provence-Alpes-Côte d'Azur"``
+        - ``"Corse"``
+
+    .. seealso::
+        :func:`get_region_wind`
+    """
+    sun_data = ArpegeSimpleAPI(date).region_sun()
+    return sun_data
+
+@memory.cache
+def get_region_wind(date: str)->pd.DataFrame:
+    """Retrun the mean wind speed for each hour of the day.
+
+    This is a simple wrapper around :py:meth:`ArpegeSimpleAPI.region_wind`.
+    Wind speed is in m/s.
+
+    .. note::
+        The function is cached to avoid multiple computation for the same date.
+        The cache is persistent (saved on the disk at ``/tmp/cache/energy_forecast``)
+
+    Parameters
+    ----------
+    date : str
+        the date at which the weather forecast is requested.
+        Must be a valid date format, e.g. ``"YYYY-MM-DD"``
+        or a ``datetime.date`` object.
+
+    Returns
+    -------
+    pd.DataFrame
+        The mean wind speed for each hour of the day.
+        The index is a DatetimeIndex and the columns are the regions of France:
+
+        - ``"Île-de-France"``
+        - ``"Centre-Val de Loire"``
+        - ``"Bourgogne-Franche-Comté"``
+        - ``"Normandie"``
+        - ``"Hauts-de-France"``
+        - ``"Grand Est"``
+        - ``"Pays de la Loire"``
+        - ``"Bretagne"``
+        - ``"Nouvelle-Aquitaine"``
+        - ``"Occitanie"``
+        - ``"Auvergne-Rhône-Alpes"``
+        - ``"Provence-Alpes-Côte d'Azur"``
+        - ``"Corse"``
+
+    .. seealso::
+        :func:`get_region_sun`
+    """
+    sun_data = ArpegeSimpleAPI(date).region_wind()
+    return sun_data
