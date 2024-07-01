@@ -62,9 +62,8 @@ extra-dependencies = [
   "sphinx-gallery",
   "sphinx_design",
   "nbsphinx",
-  "taipy",
   "streamlit",
-
+  "ipython",
 ]
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html doc/ doc/_build"

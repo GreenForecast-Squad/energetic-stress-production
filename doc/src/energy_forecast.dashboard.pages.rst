@@ -10,7 +10,7 @@ Submodules
    energy_forecast.dashboard.pages.1_Météo
    energy_forecast.dashboard.pages.2_Production
    energy_forecast.dashboard.pages.3_Consommation
-   energy_forecast.dashboard.pages.4_jours_Tempos
+   energy_forecast.dashboard.pages.4_Jours_Tempos
 
 Module contents
 ---------------
