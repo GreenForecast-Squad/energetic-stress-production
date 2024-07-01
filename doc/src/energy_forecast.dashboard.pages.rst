@@ -7,10 +7,10 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   energy_forecast.dashboard.pages.1_weather
-   energy_forecast.dashboard.pages.2_power_generation
-   energy_forecast.dashboard.pages.3_consumption_prediction
-   energy_forecast.dashboard.pages.4_prediction_tempo
+   energy_forecast.dashboard.pages.1_Météo
+   energy_forecast.dashboard.pages.2_Production
+   energy_forecast.dashboard.pages.3_Consommation
+   energy_forecast.dashboard.pages.4_jours_Tempos
 
 Module contents
 ---------------
