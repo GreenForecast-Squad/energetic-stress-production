@@ -64,6 +64,7 @@ extra-dependencies = [
   "nbsphinx",
   "taipy",
   "streamlit",
+
 ]
 [tool.hatch.envs.docs.scripts]
 build = "sphinx-build -b html doc/ doc/_build"
@@ -71,10 +72,11 @@ build = "sphinx-build -b html doc/ doc/_build"
 [tool.hatch.envs.serve]
 extra-dependencies = [
   "streamlit",
+  "streamlit-analytics2",
 ]
 
 [tool.hatch.envs.serve.scripts]
-prod = "streamlit run --server.port 8502 --server.baseUrlPath energy_forecast  src/energy_forecast/dashboard/dashboard_streamlit.py"
+prod = "streamlit run --server.port 8502 --server.baseUrlPath energy_forecast  src/energy_forecast/dashboard/Accueil.py"
 
 [tool.coverage.run]
 source_pkgs = ["energy_forecast", "tests"]
