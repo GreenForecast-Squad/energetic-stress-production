@@ -9,6 +9,8 @@ from energy_forecast.meteo import get_region_sun, get_region_wind, memory
 import pandas as pd
 import streamlit as st
 import altair as alt
+alt.renderers.set_embed_options(time_format_locale="fr-FR", format_locale="fr-FR")
+
 
 @memory.cache
 def compute_data_pv_power(date: str)->pd.DataFrame:
@@ -110,6 +112,7 @@ def compute_energy(date:str):
     energy =  r.read_file()
 
     energy = energy[["Eolien", "Solaire"]]
+    energy.rename(columns={"Eolien": "Eolien Production", "Solaire": "PV Production"}, inplace=True)
     offset_days = 5
     history_start = pd.Timestamp(date) - pd.Timedelta(f"{offset_days} days")
     energy = energy[history_start:]
@@ -132,29 +135,34 @@ if __name__ == "__main__":
     energy = energy[energy["time"].dt.minute == 0]
 
     st.title("Prévision de production ENR")
+    st.markdown("Cette page affiche les prévisions de production d'énergie renouvelable pour la date sélectionnée."
+                " Les données sont obtenues à partir de [RTE](https://www.rte-france.com/eco2mix/la-production-delectricite-en-temps-reel).")
 
-    wind_history = alt.Chart(energy).mark_line().encode(
-        y="Eolien",
-        x="time"
-    ).interactive()
-    wind_prediction = alt.Chart(energy).mark_line(color="red").encode(
-        y="Eolien Prediction",
-        x="time"
-    ).interactive()
-    wind_barplot = wind_prediction + wind_history
-    st.altair_chart(wind_barplot,
+
+    energy_long = energy.melt(id_vars="time", var_name="source", value_name="power")
+    eolen_long = energy_long[energy_long["source"].str.contains("Eolien")]
+    pv_long = energy_long[energy_long["source"].str.contains("PV")]
+
+    eolen_title = alt.Title("Production Eolien",
+                            subtitle="Production historique et prévisionnelle")
+
+    eolen_chart = alt.Chart(eolen_long, title=eolen_title).mark_line().encode(
+        x=alt.X("time:T", title="Date"),
+        y=alt.Y("power:Q", title="Production (MW)"),
+        color=alt.Color("source:N", title="Type de production"),
+    )
+
+    st.altair_chart(eolen_chart,
                     use_container_width=True
                 )
 
-    sun_history = alt.Chart(energy).mark_line().encode(
-        y="Solaire",
-        x="time"
+    sun_title = alt.Title("Production Solaire",
+                          subtitle="Production historique et prévisionnelle")
+    sun_chart = alt.Chart(pv_long, title=sun_title).mark_line().encode(
+        x=alt.X("time:T", title="Date"),
+        y=alt.Y("power:Q", title="Production (MW)"),
+        color=alt.Color("source:N", title="Type de production"),
     )
-    sun_prediction = alt.Chart(energy).mark_line(color="red").encode(
-        y="PV Prediction",
-        x="time"
-    )
-    sun_barplot = sun_prediction + sun_history
-    st.altair_chart(sun_barplot,
+    st.altair_chart(sun_chart,
                     use_container_width=True
                 )

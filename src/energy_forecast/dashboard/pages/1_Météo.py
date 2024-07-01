@@ -3,6 +3,7 @@ from energy_forecast.meteo import get_region_sun, get_region_wind, memory
 import pandas as pd
 import streamlit as st
 import altair as alt
+alt.renderers.set_embed_options(time_format_locale="fr-FR", format_locale="fr-FR")
 
 
 @memory.cache
@@ -91,23 +92,27 @@ def compute_data_wind(date: str)->pd.DataFrame:
     return data
 
 if __name__ == "__main__":
+
     st.title("Prévision meteo")
+    st.markdown("Cette page affiche les prévisions météorologiques pour les prochains jours."
+                " Les données sont obtenues à partir de [Météo France](https://www.meteofrance.com/).")
     date = pd.Timestamp.now().strftime("%Y-%m-%d")
     wind_data = compute_data_wind(date)
 
+
     wind_barplot = alt.Chart(wind_data).mark_bar().encode(
-        y="wind_speed",
-        x="time"
-    )
+        y=alt.Y("wind_speed:Q").title("Vitesse du vent (m/s)"),
+        x=alt.X("time:T").title("Date")
+    ).properties(title="Vitesse moyenne du vent en France.")
     st.altair_chart(wind_barplot,
                     use_container_width=True
                 )
 
     sun_data = compute_data_sun(date)
     sun_barplot = alt.Chart(sun_data).mark_bar().encode(
-        y="sun_flux",
-        x="time"
-    )
+        y=alt.Y("sun_flux:Q").title("Flux solaire (W/m^2)"),
+        x=alt.X("time:T").title("Date")
+    ).properties(title="Flux solaire moyen en France.")
     st.altair_chart(sun_barplot,
                     use_container_width=True
                 )
