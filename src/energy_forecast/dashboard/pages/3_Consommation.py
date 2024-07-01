@@ -9,9 +9,11 @@ from energy_forecast import ROOT_DIR
 import pandas as pd
 import streamlit as st
 import altair as alt
+from energy_forecast.meteo import memory
+
 alt.renderers.set_embed_options(time_format_locale="fr-FR", format_locale="fr-FR")
 
-@st.cache
+@memory.cache
 def get_weekly_forecast(secret: str)->pd.DataFrame:
     """Get the weekly forecast for the total electricity consumption.
 

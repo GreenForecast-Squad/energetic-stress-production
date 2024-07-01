@@ -1,4 +1,4 @@
-energy\_forecast.dashboard.Accueilt module
+energy\_forecast.dashboard.Accueil module
 ======================================================
 
 .. automodule:: energy_forecast.dashboard.Accueil
