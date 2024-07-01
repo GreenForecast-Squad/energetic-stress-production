@@ -1,39 +1,27 @@
-import os
-
+from energy_forecast.energy import TempoCalendarDownloader
 import pandas as pd
+from pathlib import Path
 
-in_relative_path = "../energetic-stress-production/data/bronze/tempo/"
-in_absolute_path = os.path.abspath(os.path.join(os.getcwd(), in_relative_path))
-out_relative_path = "../energetic-stress-production/data/silver/tempo_2014_2024.csv"
-out_absolute_path = os.path.abspath(os.path.join(os.getcwd(), out_relative_path))
+CURRENT_DIR = Path(__file__).resolve().parent
+DATA_DIR = CURRENT_DIR.parent / "data/bronze/tempo"
+OUT_FILE = CURRENT_DIR.parent / "data/silver/tempo_2014_2024.csv"
 
-
-def get_all_paths(in_absolute_path: str) -> list:
-    all_tempo_path = []
-    for y in range(2014, 2024):
-        all_tempo_path.append(in_absolute_path + f"/eCO2mix_RTE_tempo_{y}-{y+1}.xlsx")
-    return all_tempo_path
-
-
-def join_data(paths: list) -> pd.DataFrame:
-    data = pd.DataFrame()
-    for path in paths:
-        temporary_df = pd.read_excel(path)
-        temporary_df = temporary_df.drop(temporary_df.tail(1).index)
-        data = pd.concat([data, temporary_df])
-    return data
-
+def download_tempo_data():
+    """Download the Tempo data from RTE."""
+    downloader = TempoCalendarDownloader()
+    downloader.download()
+    return downloader.read_file()
 
 def write_data(data: pd.DataFrame):
-    data = data.rename(columns={"Type de jour TEMPO": "type_tempo"})
-    print(f"Wrtting data to '{out_absolute_path}'...")
-    data.to_csv(out_absolute_path, index=False)
+    """Save the data to a CSV file."""
+    print(f"Wrtting data to '{OUT_FILE}'...")
+    OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    data.to_csv(OUT_FILE, index=False)
 
-
-def __init__():
-    paths = get_all_paths(in_absolute_path)
-    data = join_data(paths)
+def main():
+    data = download_tempo_data()
     write_data(data)
 
 
-__init__()
+if __name__ == "__main__":
+    main()

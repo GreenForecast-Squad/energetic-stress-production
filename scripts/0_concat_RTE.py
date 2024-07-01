@@ -1,116 +1,68 @@
-import os
-
+from pathlib import Path
+from energy_forecast.energy import ECO2MixDownloader
 import pandas as pd
 
-in_relative_path = "../energetic-stress-production/data/bronze/rte/"
-in_absolute_path = os.path.abspath(os.path.join(os.getcwd(), in_relative_path))
-out_relative_path = "../energetic-stress-production/data/silver/rte_production.csv"
-out_absolute_path = os.path.abspath(os.path.join(os.getcwd(), out_relative_path))
+CURRENT_DIR = Path(__file__).resolve().parent
+DATA_DIR = CURRENT_DIR.parent / "data/bronze/rte"
+OUT_FILE = CURRENT_DIR.parent / "data/silver/rte_production.csv"
+CURRENT_YEAR = pd.Timestamp("now").year
 
-empty_column = [" Stockage batterie", "Déstockage batterie", "Eolien terrestre", "Eolien offshore"]
+def get_list_years(start_year=2014, end_year=CURRENT_YEAR) -> list[int]:
+    """Return a list of years from start_year to the end_year.
 
+    end_year is included in the list.
 
-def get_all_definitive_paths() -> list:
+    :return: Une liste avec toutes les années (int)
     """
-    Récupère le path de tout les fichiers annuel définitifs
+    return list(range(start_year, end_year + 1))
 
-    :return: Une liste avec tout les paths
+def get_one_year_data(year: int) -> pd.DataFrame:
+    """Télécharge et lit les données RTE pour une année donnée.
+
+    :param year: Année pour laquelle on veut les données
+    :return: Dataframe avec les données RTE
     """
-    all_rte_path = []
-    for y in range(2014, 2021):
-        all_rte_path.append(in_absolute_path + f"/eCO2mix_RTE_Annuel-Definitif_{y}.xls")
-    return all_rte_path
-
-
-def join_defintive_data(paths: list) -> pd.DataFrame:
-    data = pd.DataFrame()
-    for path in paths:
-        temporary_df = pd.read_csv(
-            os.path.join("raw_datasets", path),
-            skipfooter=1,
-            engine="python",
-            index_col=False,
-            skiprows=lambda x: x % 2 != 1 if x != 0 else False,
-            encoding="latin-1",
-            sep="\t",
-        )
-        data = pd.concat([data, temporary_df])
+    downloader = ECO2MixDownloader(year)
+    downloader.download()
+    data = downloader.read_file()
     return data
 
+def join_yearly_data(years: list) -> pd.DataFrame:
+    """Joint les données pour plusieurs années."""
+    list_data = []
+    for year in years:
+        temporary_df = get_one_year_data(year)
+        list_data.append(temporary_df)
+    return pd.concat(list_data)
 
-def get_definitive_data() -> pd.DataFrame:
+def prepare_data(data: pd.DataFrame) -> pd.DataFrame:
+    """Prépare les données pour l'écriture.
+
+    Ne garde que les heures pleines et enlève les lignes avec uniquement des NaN.
+
     """
-    Récupère toutes les données annuelles définitives.
-    Concatène dans un seul dataframe Pandas.
-
-    :return: Dataframe avec les données définitives
-    """
-    definitive_paths = get_all_definitive_paths()
-    data = join_defintive_data(definitive_paths)
-    return data
-
-
-def get_consolid_data() -> pd.DataFrame:
-    """
-    Retourne les données consolidées dans un dataframe Pandas.
-
-    On filtre uniquement pour garder les rows à la demi-heure.
-    (on a une prédiction toute les 15 min mais on l'enlève)
-
-    :return: Dataframe avec les données consolidées
-    """
-    data = pd.read_csv(
-        f"{in_absolute_path}/eCO2mix_RTE_En-cours-Consolide.xls",
-        skipfooter=0,
-        index_col=False,
-        engine="python",
-        encoding="latin-1",
-        sep="\t",
-        usecols=lambda col: col not in empty_column,
-    )
-    data = data[data["Heures"].str.contains(":30|:00")]
-    data["Date"] = data["Date"].str.replace("/", "-")
-    data["Date"] = pd.to_datetime(data["Date"], format="%d-%m-%Y").dt.date
-    return data
-
-
-def get_en_cours_data() -> pd.DataFrame:
-    """
-    TODO: Filtrer les données inutiles (on a beaucoup de NaN sur les derniers rows)
-
-    :return: Dataframe "en cours" RTE
-    """
-    data = pd.read_csv(
-        f"{in_absolute_path}/eCO2mix_RTE_En-cours-TR.xls",
-        skipfooter=0,
-        index_col=False,
-        engine="python",
-        encoding="latin-1",
-        sep="\t",
-        usecols=lambda col: col not in empty_column,
-    )
+    data = data[data.index.minute == 0]
+    data = data.dropna(how="all")
     return data
 
 
 def write_data(data: pd.DataFrame):
-    data = data.rename(columns={"Type de jour TEMPO": "type_tempo"})
-    print(f"Wrtting data to '{out_absolute_path}'...")
-    data.to_csv(out_absolute_path, index=False)
+    print(f"Wrtting data to '{OUT_FILE}'...")
+    data.to_csv(OUT_FILE, index=True)
 
 
-def __init__():
+def main():
     """
     1. Getting definitive RTE data "RTE_Annuel-Defintif_YYYY.xls"
     2. Getting consolidated RTE data "RTE_En-cours-Consolide.xls"
     3. Getting definitive RTE data "RTE_En-cours-TR.xls"
-    4. Concat all 3
+    4. Join all data
+    5. Filter data
     5. Writes data
     """
-    definitive_data = get_definitive_data()
-    consolid_data = get_consolid_data()
-    en_cours_data = get_en_cours_data()
-    data = pd.concat([definitive_data, consolid_data, en_cours_data])
+    data = join_yearly_data(get_list_years())
+    data = prepare_data(data)
     write_data(data)
 
-
-__init__()
+if __name__ == "__main__":
+    main()
