@@ -12,11 +12,11 @@ Cette application est une démonstration d'un tableau de bord de prévision éne
 
 Il est divisé en trois sections:
 
-- <a href="weather" target = "_self">Prévision météo</a>
-- <a href="power_generation" target = "_self">Prévision énergétique</a>
-- <a href="consumption_prediction" target = "_self">Prévision de consommation</a>
-- <a href="prediction_tempo" target = "_self">Prédiction Tempo</a>
+- <a href="1_Météo" target = "_self">Prévision météo</a>
+- <a href="2_Production" target = "_self">Prévision énergétique</a>
+- <a href="3_Consommation" target = "_self">Prévision de consommation</a>
+- <a href="4_Jours_Tempos" target = "_self">Prédiction Tempo</a>
 """
     , unsafe_allow_html=True)
 
-    st.sidebar.success("Sélectionnez une démo ci-dessus.")
+    st.sidebar.success("Sélectionnez une page ci-dessus.")
