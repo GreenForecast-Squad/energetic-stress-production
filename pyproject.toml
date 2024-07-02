@@ -1,0 +1,97 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "energy-forecast"
+dynamic = ["version"]
+description = 'Predict the french electricity mix'
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Antoine TAVANT", email = "antoinetavant@hotmail.fr" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "numpy>=1.25.0,<2.0.0",  # numpy 2.0.0 is released but not yet supported by all dependencies
+  "pandas",
+  "xarray",
+  "netCDF4",
+  "watchfiles",
+  "scikit-learn",
+  "matplotlib",
+  "eccodes",
+  "cfgrib",
+  "requests",
+  "pyyaml",
+  "statsmodels",
+
+]
+
+[project.urls]
+Documentation = "https://github.com/GreenForecast-Squad/energetic-stress-production#readme"
+Issues = "https://github.com/GreenForecast-Squad/energetic-stress-production/issues"
+Source = "https://github.com/GreenForecast-Squad/energetic-stress-production"
+
+[tool.hatch.version]
+path = "src/energy_forecast/__init__.py"
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/energy_forecast tests}"
+
+[tool.hatch.envs.docs]
+extra-dependencies = [
+  "sphinx",
+  "pydata-sphinx-theme",
+  "sphinx-gallery",
+  "sphinx_design",
+  "nbsphinx",
+  "streamlit",
+  "ipython",
+]
+[tool.hatch.envs.docs.scripts]
+build = "sphinx-build -b html doc/ doc/_build"
+
+[tool.hatch.envs.serve]
+extra-dependencies = [
+  "streamlit",
+  "streamlit-analytics2",
+]
+
+[tool.hatch.envs.serve.scripts]
+prod = "streamlit run --server.port 8502 --server.baseUrlPath energy_forecast  src/energy_forecast/dashboard/Accueil.py"
+
+[tool.coverage.run]
+source_pkgs = ["energy_forecast", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/energy_forecast/__about__.py",
+]
+
+[tool.coverage.paths]
+energy_forecast = ["src/energy_forecast", "*/energy-forecast/src/energy_forecast"]
+tests = ["tests", "*/energy-forecast/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
