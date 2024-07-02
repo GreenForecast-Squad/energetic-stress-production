@@ -1,0 +1,40 @@
+
+name : Deploy Panel App
+
+concurrency: production
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy Panel App
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{secrets.SSH_PRIVATE_KEY}}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 -H ${{secrets.PROD_IP}} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Server
+        run: |
+          ssh ubuntu@${{secrets.PROD_IP}} << 'EOF'
+          # Arrêter le serveur Panel
+          pkill -f 'streamlit run'
+          cd ${{vars.PROD_PATH}}
+          git pull
+          git lfs pull
+          nohup hatch run serve:prod </dev/null  >./log-prod.log 2>&1 &
+          EOF
