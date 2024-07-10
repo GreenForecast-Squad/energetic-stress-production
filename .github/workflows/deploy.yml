@@ -31,10 +31,7 @@ jobs:
       - name: Deploy to Server
         run: |
           ssh ubuntu@${{secrets.PROD_IP}} << 'EOF'
-          # Arrêter le serveur Panel
-          pkill -f 'streamlit run'
           cd ${{vars.PROD_PATH}}
           git pull
           git lfs pull
-          nohup hatch run serve:prod </dev/null  >./log-prod.log 2>&1 &
           EOF
