@@ -1,9 +1,11 @@
-from pathlib import Path
-import pandas as pd
-import xarray as xr
-import requests
-import yaml
 import logging
+import time
+from pathlib import Path
+
+import pandas as pd
+import requests
+import xarray as xr
+import yaml
 from joblib import Memory
 
 logger = logging.getLogger(__name__)
@@ -106,7 +108,7 @@ class ArpegeSimpleAPI():
         list_files = []
         for forecast_horizon in self.forecast_horizons:
             logger.debug(f"Fetching {forecast_horizon}")
-            url = self.get_url(forecast_horizon)
+            url = self.get_url(forecast_horizon=forecast_horizon)
             filename = self.get_filename(forecast_horizon)
             list_files.append(filename)
             if Path(filename).exists():
@@ -334,3 +336,47 @@ def get_region_wind(date: str)->pd.DataFrame:
     """
     sun_data = ArpegeSimpleAPI(date).region_wind()
     return sun_data
+
+def warm_cache(logger, date=None, max_counter=30, sleep_duration=600):
+    """Try to fetch the data from the API until it is successful.
+
+    Parameters
+    ----------
+    logger : logging.Logger
+        the logger to use.
+    date : str, optional
+        the date at which the weather forecast was computed.
+        Must be a valid date format, e.g. ``"YYYY-MM-DD"``
+        Default is the current date.
+    max_counter : int, optional
+        the maximum number of attempts.
+        Default is 30.
+    sleep_duration : int, optional
+        the duration to sleep between each attempt in seconds.
+        Default is 600 (10 minutes).
+
+    Raises
+    ------
+    TimeoutError
+        if the maximum number of attempts is reached.
+
+    """
+    date = date or pd.Timestamp("today").strftime("%Y-%m-%d")
+    client = ArpegeSimpleAPI(date)
+    counter=0
+    while True:
+        logger.info(f"Attempt {counter}")
+        try :
+            client.fetch()
+            break
+        except requests.exceptions.HTTPError as e:
+            logger.warning(e)
+            logger.info(f"Sleeping for {sleep_duration} seconds")
+            time.sleep(sleep_duration)
+            counter += 1
+            if counter > max_counter:
+                raise TimeoutError("Max counter reached")
+
+if __name__ == "__main__":
+    logger.info("Fetching data for today")
+    warm_cache(logger, date="2025-01-01")
