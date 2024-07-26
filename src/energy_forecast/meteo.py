@@ -379,4 +379,4 @@ def warm_cache(logger, date=None, max_counter=30, sleep_duration=600):
 
 if __name__ == "__main__":
     logger.info("Fetching data for today")
-    warm_cache(logger, date="2025-01-01")
+    warm_cache(logger)
