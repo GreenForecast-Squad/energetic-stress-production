@@ -1,8 +1,14 @@
-"""Download and read data from RTE Eco2Mix."""
-import requests
-import pandas as pd
-from pathlib import Path
+"""Download and read data from RTE Eco2Mix.
+
+DEPRECATED do not use anymore.
+
+"""
 import os
+from pathlib import Path
+
+import pandas as pd
+import requests
+
 
 class RTEZipFileDownloader:
     """Provide the functionality to download and unzip a zip file from RTE.
@@ -120,6 +126,7 @@ class ECO2MixDownloader(RTEZipFileDownloader):
         data["Heures"] = pd.to_timedelta(data["Heures"] + ":00")
         data["time"] = data["Date"] + data["Heures"]
         return data.set_index("time")
+
 
 if __name__ == "__main__":
     r = ECO2MixDownloader(year=2024)

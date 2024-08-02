@@ -1,6 +1,9 @@
-import requests
-import pandas as pd
 from typing import TypedDict
+
+import pandas as pd
+
+from energy_forecast.rte_api_core import RTEAPROAuth2
+
 
 class OneValue(TypedDict):
     start_date: str
@@ -24,49 +27,17 @@ class PredictionForecast(TypedDict):
     weekly_forecasts: list[DayForecast]
 
 
-class RTEAPROAuth2:
-    url_token = "https://digital.iservices.rte-france.com/token/oauth/"
-
-    def __init__(self, secret):
-        self.secret = secret
-        self.token = None
-        self.token_type = None
-        self.token_expires_in = None
-        self.token_expires_at = None
-        self.get_token()
-
-    def get_token(self):
-        """Get a token to access the API.
-        """
-        headers_token = {
-            "Authorization": "Basic {}".format(self.secret),
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-        req = requests.post(self.url_token,
-                            headers=headers_token
-                            )
-        req.raise_for_status()
-        self.token = req.json()["access_token"]
-        self.token_type = req.json()["token_type"]
-        self.token_expires_in = req.json()["expires_in"]
-        self.token_expires_at = pd.Timestamp("now") + pd.Timedelta(self.token_expires_in, unit="s")
-        self.headers: dict[str, str] = {
-            "Host": "digital.iservices.rte-france.com",
-            "Authorization": "Bearer {}".format(self.token),
-        }
-    def check_token(self):
-        """Check if the token is still valid. If not, get a new one."""
-        if self.token_expires_at - pd.Timestamp("now") < pd.Timedelta(10, unit="s"):
-            self.get_token()
-
-
-
 class PredictionForecastAPI(RTEAPROAuth2):
     """Access the RTE API to get the weekly forecast of consumption."""
 
     url_api = "https://digital.iservices.rte-france.com/open_api/consumption/v1/weekly_forecasts"
 
-    def get_raw_data(self, start_date, end_date=None, horizon="1w") -> PredictionForecast:
+
+
+    def get_raw_data(self,
+                     start_date: str | pd.Timestamp |None=None,
+                     end_date: str | pd.Timestamp|None=None,
+                     horizon="1w") -> PredictionForecast:
         """Retrieve the raw data from the API.
 
         Parameters
@@ -85,21 +56,12 @@ class PredictionForecastAPI(RTEAPROAuth2):
             The raw data from the API.
 
         """
-        self.check_token()
-        start_date = pd.Timestamp(start_date)
-        if end_date is None:
-            end_date = start_date + pd.Timedelta(horizon)
-        else:
-            end_date = pd.Timestamp(end_date)
-
+        start_date, end_date = self.check_start_end_dates(start_date, end_date, horizon)
         params = {
-            "start_date": start_date.strftime("%Y-%m-%dT00:00:00+02:00"),
-            "end_date": end_date.strftime("%Y-%m-%dT00:00:00+02:00"),
+            "start_date": self.format_date(start_date),
+            "end_date": self.format_date(end_date),
         }
-        req = requests.get(self.url_api,
-                           headers=self.headers,
-                           params=params)
-        req.raise_for_status()
+        req = self.fetch_response(params)
         return req.json()
 
     def get_weekly_forecast(self, start_date, end_date=None, horizon="1w"):
