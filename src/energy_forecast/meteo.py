@@ -377,6 +377,8 @@ def warm_cache(logger, date=None, max_counter=30, sleep_duration=600):
             if counter > max_counter:
                 raise TimeoutError("Max counter reached")
 
+
+
 if __name__ == "__main__":
     logger.info("Fetching data for today")
     warm_cache(logger)

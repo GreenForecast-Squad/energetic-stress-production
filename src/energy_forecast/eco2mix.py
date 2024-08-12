@@ -1,4 +1,7 @@
+"""Access the RTE eco2mix via ODRE API to get real-time data on the French electricity grid.
 
+Needed mostly for the regional data, as the national data is available on the RTE API.
+"""
 import logging
 
 import numpy as np
