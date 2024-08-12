@@ -163,3 +163,4 @@ notebooks/weather/forcasts/*.parquet
 data/bronze/*/*.xls
 data/bronze/*.xls
 doc/_build
+.vscode/settings.json

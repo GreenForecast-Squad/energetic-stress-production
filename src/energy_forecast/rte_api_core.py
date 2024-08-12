@@ -1,12 +1,41 @@
 import pandas as pd
 import requests
+import os
 
+RTE_API_SECRET_NAME = "SECRET_RTE_API"
 
 class RTEAPROAuth2:
+    """Client class to access the RTE API.
+    
+    Authentification is done using OAuth2.
+    The token is stored in the :py:attr:`token` attribute.
+    
+    The token is:
+    - fetched at initialization of the class
+    - checked before each request to the API
+    - refreshed if it is about to expire
+    
+    Parameters
+    ----------
+    secret : str, optional
+        The secret to access the API.
+        If None, it is fetched from the environment variable ``"SECRET_RTE_API"``.
+        by default None
+    
+    Examples
+    --------
+    >>> my_api = RTEAPROAuth2()
+    
+    Note
+    ----
+    In order to use this class, you need to set the attribute :py:attr:`url_api` to the API endpoint.
+    Then, use the method :py:meth:`fetch_response` to get the response from the API.
+
+    """
     url_token = "https://digital.iservices.rte-france.com/token/oauth/"
     url_api: str
-    def __init__(self, secret: str) -> None:
-        self.secret = secret
+    def __init__(self, secret: str | None = None) -> None:
+        self.secret = secret or os.getenv(RTE_API_SECRET_NAME)
         self.token: str
         self.token_type: str
         self.token_expires_in: str
