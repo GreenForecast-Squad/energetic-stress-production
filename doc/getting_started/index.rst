@@ -1,6 +1,10 @@
 Getting Started
 ===============
 
+Project description
+-------------------
+See the :doc:`project description <project_description>` for a detailed description of the project.
+
 Installation
 ------------
 You can install the package from the source code by cloning the repository and
@@ -34,3 +38,9 @@ Detailed use cases
 ==================
 
 To see move detailed use cases, you can check the tutorials in the :doc:`../user_guide/index` !
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+
+   project_description
