@@ -10,3 +10,4 @@ data/silver/weather_forecasts/sun_flux_downward_hourly_d0.nc filter=lfs diff=lfs
 data/silver/weather_forecasts/temperature_hourly_d1.nc filter=lfs diff=lfs merge=lfs -text
 data/silver/weather_forecasts/temperature_hourly_d3.nc filter=lfs diff=lfs merge=lfs -text
 data/silver/weather_forecasts/wind_speed_hourly_d1.nc filter=lfs diff=lfs merge=lfs -text
+data/silver/forecasted_production_rte.csv filter=lfs diff=lfs merge=lfs -text
