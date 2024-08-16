@@ -377,6 +377,99 @@ def warm_cache(logger, date=None, max_counter=30, sleep_duration=600):
             if counter > max_counter:
                 raise TimeoutError("Max counter reached")
 
+def download_historical_forecasts(s3_key,
+                                  s3_secret,
+                                  s3_entrypoint,
+                                  s3_bucket,
+                                  prefix="./",
+                                  variables="all",
+                                  forecast_type="all",
+                                  dryrun=False
+                                  ):
+    """Download the historical forecasts from the S3 bucket.
+
+    Parameters
+    ----------
+    s3_key : str
+        the key to access the S3 bucket.
+    s3_secret : str
+        the secret to access the S3 bucket.
+    s3_entrypoint : str
+        the entrypoint of the S3 bucket.
+    s3_bucket : str
+        the name of the S3 bucket.
+    prefix : str
+        The prefix where the files are downloaded.
+        Should be similar to ``"./data/silver"``.
+    variables : str or list[str], optional
+        the variables to download.
+        Can be ``"wind_speed_hourly"``, ``"sun_flux_downward_hourly"``, or ``"temperature_hourly"``
+        or a list of these values.
+        Default is ``"all"``, which downloads all the variables.
+    forecast_type : str or list[str], optional
+        the forecast type to download.
+        Can be ``"d0"``, ``"d1"``, ``"d2"``, or ``"d3"``,
+        or a list of these values.
+        Default is ``"all"``, which downloads all the forecast types.
+    dryrun : bool, optional
+        if True, do not download the files.
+        Default is False.
+
+    Returns
+    -------
+    list[Path]
+        the list of the files downloaded.
+    """
+    import boto3
+
+    session = boto3.Session(
+        aws_access_key_id=s3_key,
+        aws_secret_access_key=s3_secret,
+    )
+    s3 = session.resource("s3", endpoint_url=s3_entrypoint)
+    bucket = s3.Bucket(s3_bucket)
+    list_files = []
+    key_prefix = "weather_forecasts"
+    if variables == "all":
+        variables = ["wind_speed_hourly",
+                     "sun_flux_downward_hourly",
+                     "temperature_hourly"]
+    if isinstance(variables, str):
+        variables = [variables]
+    for var in variables:
+        if var not in ["wind_speed_hourly",
+                       "sun_flux_downward_hourly",
+                       "temperature_hourly"]:
+            raise ValueError(f"Unknown variable {var} : must be in ['wind_speed_hourly', 'sun_flux_downward_hourly', 'temperature_hourly']")
+    if forecast_type == "all":
+        forecast_type = ["d0", "d1", "d2", "d3"]
+    if isinstance(forecast_type, str):
+        forecast_type = [forecast_type]
+    for forecast in forecast_type:
+        if forecast not in ["d0", "d1", "d2", "d3"]:
+            raise ValueError(f"Unknown forecast type {forecast} : must be in ['d0', 'd1', 'd2', 'd3']")
+    
+    for var in variables:
+        for forecast in forecast_type:
+            key = f"{key_prefix}/{var}_{forecast}.nc"
+            # test if the key exists
+            filename = Path(prefix + "/" + key)
+            if filename.exists():
+                print(f"{filename} already downloaded, skipping")
+                continue
+            filename.parent.mkdir(parents=True, exist_ok=True)
+            if dryrun:
+                print(f"DRY RUN : would Download {key} to {filename}")
+                # test if the key exists without downloading it
+                try : 
+                    s3.Object(s3_bucket, key).load()
+                except Exception as e:
+                    print(e)
+                
+            else:
+                bucket.download_file(key, filename)
+            list_files.append(filename)
+    return list_files
 
 
 if __name__ == "__main__":

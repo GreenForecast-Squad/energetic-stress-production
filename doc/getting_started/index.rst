@@ -5,6 +5,13 @@ Project description
 -------------------
 See the :doc:`project description <project_description>` for a detailed description of the project.
 
+
+Data sources
+------------
+
+See the :doc:`data sources <data_sources>` for a detailed description of the data sources available
+and the corresponding way to access them.
+
 Installation
 ------------
 You can install the package from the source code by cloning the repository and
@@ -44,3 +51,4 @@ To see move detailed use cases, you can check the tutorials in the :doc:`../user
    :hidden:
 
    project_description
+   data_sources
