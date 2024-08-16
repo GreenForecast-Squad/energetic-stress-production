@@ -60,7 +60,8 @@ Some are the same as the ones provided by the APIs above, but some are not.
 
 In particular, the historical regional production and consumption are available.
 
-You can access it using the function ``energy_forecast.eco2mix.get_data`` (Refactoring in progress)
+You can access it using the function ``energy_forecast.eco2mix.get_data`` (Refactoring in progress) to access the API, or the class ``energy_forecast.energy.ECO2MixDownloader``
+to download the Excel files from the website.
 
 Weather Data Sources
 --------------------
