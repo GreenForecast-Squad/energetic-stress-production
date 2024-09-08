@@ -166,3 +166,4 @@ doc/_build
 .vscode/settings.json
 data/silver/*.nc
 data/silver/weather_forecasts/*.nc
+.vscode/settings.json

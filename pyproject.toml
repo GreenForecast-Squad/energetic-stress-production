@@ -74,6 +74,15 @@ extra-dependencies = [
   "streamlit-analytics2",
 ]
 
+# new env for django
+[tool.hatch.envs.django]
+extra-dependencies = [
+  "django",
+  "psycopg2-binary",
+  "django-crontab",
+  "django-environ",
+  "django-debug-toolbar",
+]
 [tool.hatch.envs.serve.scripts]
 prod = "streamlit run --server.port 8502 --browser.gatherUsageStats false --server.runOnSave true --server.baseUrlPath energy_forecast  src/energy_forecast/dashboard/Accueil.py"
 
@@ -98,3 +107,4 @@ exclude_lines = [
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
+

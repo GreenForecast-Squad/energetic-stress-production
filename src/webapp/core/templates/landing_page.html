@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Energy Forecast</title>
+</head>
+<body>
+    <h1>Energy Forecast for the Next 3 Days</h1>
+    <ul>
+        {% for forecast in forecasts %}
+            <li>{{ forecast.date }}: {{ forecast.forecast_data }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
