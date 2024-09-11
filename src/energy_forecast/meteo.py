@@ -5,8 +5,10 @@ from pathlib import Path
 import pandas as pd
 import requests
 import xarray as xr
-import yaml
 from joblib import Memory
+from .constants import departement_names, region_names, france_bounds
+from energy_forecast import ROOT_DIR
+from energy_forecast.geography import get_mask_departements, get_mask_regions
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -26,11 +28,8 @@ KEYS_FILTER_T2M = {
     "cfVarName": "t2m",
 }
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-GEO_DIR = PROJECT_ROOT / "data" / "geo"
+GEO_DIR = ROOT_DIR / "data" / "geo"
 bounds_file = GEO_DIR / "france_bounds.yml"
-region_name_file = GEO_DIR / "regions_name.yml"
-region_mask_file = GEO_DIR / "mask_france_regions.nc"
 
 
 class ArpegeSimpleAPI():
@@ -71,19 +70,14 @@ class ArpegeSimpleAPI():
     def __init__(self,
                  date=pd.Timestamp("today").strftime("%Y-%m-%d"),
                  time="00:00:00",
-                 prefix="/tmp/arpege"):
+                 prefix="/tmp/arpege",):
         self.date = date
         self.time = time
         self.prefix = prefix
-        with open(bounds_file, "r") as f:
-            bounds = yaml.safe_load(f)
-        self.min_lon = bounds["min_lon"]
-        self.max_lon = bounds["max_lon"]
-        self.min_lat = bounds["min_lat"]
-        self.max_lat = bounds["max_lat"]
-        with open(region_name_file, "r") as f:
-            self.regions_names = yaml.safe_load(f)
-        self.masks = xr.load_dataarray(region_mask_file)
+        self.min_lon = france_bounds["min_lon"]
+        self.max_lon = france_bounds["max_lon"]
+        self.min_lat = france_bounds["min_lat"]
+        self.max_lat = france_bounds["max_lat"]
 
     def get_url(self, forecast_horizon):
         """Format the URL to fetch the data."""
@@ -143,7 +137,8 @@ class ArpegeSimpleAPI():
                                backend_kwargs={"filter_by_keys": keys_filter},
                                )
 
-    def read_files_as_xarray(self, list_files, keys_filter):
+    @staticmethod
+    def read_files_as_xarray(list_files, keys_filter):
         """Read all the files as an xarray dataset and concatenate them along the step dimension.
 
         Parameters
@@ -158,10 +153,16 @@ class ArpegeSimpleAPI():
         xr.Dataset
             the dataset containing the weather forecast data.
         """
+        return xr.open_mfdataset(list_files,
+                                 engine="cfgrib",
+                                 backend_kwargs={"filter_by_keys": keys_filter},
+                                 )
+        
         list_xr = []
         for filename in list_files:
             list_xr.append(self.read_file_as_xarray(filename, keys_filter))
         return xr.concat(list_xr, dim="step")
+        
 
     def read_sspd(self):
         """Fetch the data and read the solar radiation.
@@ -186,6 +187,46 @@ class ArpegeSimpleAPI():
         return self.read_files_as_xarray(list_files, KEYS_FILTER_WIND)
 
     def region_sun(self):
+        """Return the mean sun flux for each region of France.
+        
+        Returns
+        -------
+        pd.DataFrame
+            The mean sun flux for each region of France
+        """
+        return self.mask_sun(get_mask_regions(), region_names, "region")
+    
+    def departement_sun(self):
+        """Return the mean sun flux for each department of France.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean sun flux for each department of France
+        """
+        return self.mask_sun(get_mask_departements(), departement_names, "departement")
+    
+    def region_wind(self):
+        """Return the mean wind speed for each region of France.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean wind speed for each region of France
+        """
+        return self.mask_wind(get_mask_regions(), region_names, "region")
+    
+    def departement_wind(self):
+        """Return the mean wind speed for each department of France.
+        
+        Returns
+        -------
+        pd.DataFrame
+            The mean wind speed for each department of France
+        """
+        return self.mask_wind(get_mask_departements(), departement_names, "departement")
+    
+    def mask_sun(self, masks, names, label):
         """Compute the mean sun flux for each region of France.
 
         Returns
@@ -194,22 +235,8 @@ class ArpegeSimpleAPI():
             The mean sun flux for each region of France.
         """
         da_sun = self.read_sspd().ssrd
-        da_sun_france = da_sun.sel(
-        longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
-        )
-        try :
-            da_sun_region = da_sun_france.groupby(self.masks).mean(["latitude", "longitude"])
-        except ValueError:
-            da_sun_region = da_sun_france.groupby(self.masks).mean("stacked_longitude_latitude")
-        # relabel the regions groups
-        da_sun_region["group"] = self.regions_names
-        # change the name of the groups
-        da_sun_region = da_sun_region.rename(group="region")
-        df_sun_regions = da_sun_region.to_dataframe()
-        df_sun_regions = df_sun_regions.set_index("valid_time", append=True)
-        df_sun_regions = df_sun_regions.droplevel("step")
-        df_unstacked = df_sun_regions["ssrd"].unstack("region")
-
+        df_groups = self.calculate_mean_group_value(masks, names, label, da_sun)
+        df_unstacked = df_groups["ssrd"].unstack(label)
         zero_pad = df_unstacked.iloc[0].copy().to_frame().T
         zero_pad[:] = 0
         zero_pad.index = zero_pad.index - pd.Timedelta("1h")
@@ -218,7 +245,44 @@ class ArpegeSimpleAPI():
         df_instant_flux.index -= pd.Timedelta("1h")
         return df_instant_flux
 
-    def region_wind(self):
+    def calculate_mean_group_value(self, masks, names, label, da_value):
+        """Group the data by the masks and calculate the mean value for each group.
+
+        Parameters
+        ----------
+        masks : xr.DataArray
+            The masks to group the data.
+            Must have the same dimensions longitude and Latitude
+            as the data.
+        names : list[str]
+            The names of the groups.
+        label : str
+            the name of the column to use for the groups.
+        da_value : xr.DataArray
+            The data to group.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean value for each group.
+        """
+        da_france = da_value.sel(
+        longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
+        )
+        try :
+            da_groups = da_france.groupby(masks).mean(["latitude", "longitude"])
+        except ValueError:
+            da_groups = da_france.groupby(masks).mean("stacked_longitude_latitude")
+        # relabel the regions groups
+        da_groups["group"] = names
+        # change the name of the groups
+        da_groups = da_groups.rename(group=label)
+        df_groups = da_groups.to_dataframe()
+        df_groups = df_groups.set_index("valid_time", append=True)
+        df_groups = df_groups.droplevel("step")
+        return df_groups
+    
+    def mask_wind(self, masks, names, label):
         """Compute the mean wind speed for each region of France.
 
         Returns
@@ -227,22 +291,8 @@ class ArpegeSimpleAPI():
             The mean wind speed for each region of France.
         """
         da_wind = self.read_wind().si10
-        da_wind_france = da_wind.sel(
-        longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
-        )
-        try :
-            da_wind_region = da_wind_france.groupby(self.masks).mean(["latitude", "longitude"])
-        except ValueError:
-            da_wind_region = da_wind_france.groupby(self.masks).mean("stacked_longitude_latitude")
-        # relabel the regions groups
-        da_wind_region["group"] = self.regions_names
-        # change the name of the groups
-        da_wind_region = da_wind_region.rename(group="region")
-        df_wind_regions = da_wind_region.to_dataframe()
-        df_wind_regions = df_wind_regions.set_index("valid_time", append=True)
-        df_wind_regions = df_wind_regions.droplevel("step")
-        df_unstacked = df_wind_regions["si10"].unstack("region")
-
+        df_groups = self.calculate_mean_group_value(masks, names, label, da_wind)
+        df_unstacked = df_groups["si10"].unstack(label)
         return df_unstacked
 
 
