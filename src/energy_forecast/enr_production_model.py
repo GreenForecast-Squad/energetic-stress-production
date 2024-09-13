@@ -59,8 +59,10 @@ class ENRProductionModel:
         wind_predictions = self.model_wind.predict(wind_speed_preprocessed)
         sun_flux_preprocessed = self.pre_process_sun_flux(sun_flux)
         sun_predictions = self.model_sun.predict(sun_flux_preprocessed)
-        self.predictions = pd.concat([pd.Series(wind_predictions, name="wind"), pd.Series(sun_predictions, name="sun")], axis=1)
-        self.predictions.index = wind_speed.index
+        self.predictions = pd.concat([pd.Series(wind_predictions, name="wind",
+                                                index=wind_speed.index),
+                                      pd.Series(sun_predictions, name="sun",
+                                                index=sun_flux.index)], axis=1)
         return self.predictions
     
     def save(self, path:str | Path | None=None, filename="model.pkl") -> None:
