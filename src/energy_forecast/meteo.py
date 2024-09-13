@@ -156,13 +156,7 @@ class ArpegeSimpleAPI():
         return xr.open_mfdataset(list_files,
                                  engine="cfgrib",
                                  backend_kwargs={"filter_by_keys": keys_filter},
-                                 )
-        
-        list_xr = []
-        for filename in list_files:
-            list_xr.append(self.read_file_as_xarray(filename, keys_filter))
-        return xr.concat(list_xr, dim="step")
-        
+                                 )        
 
     def read_sspd(self):
         """Fetch the data and read the solar radiation.
@@ -235,52 +229,12 @@ class ArpegeSimpleAPI():
             The mean sun flux for each region of France.
         """
         da_sun = self.read_sspd().ssrd
-        df_groups = self.calculate_mean_group_value(masks, names, label, da_sun)
+        df_groups = calculate_mean_group_value(masks, names, label, da_sun, self.min_lon, self.max_lon, self.min_lat, self.max_lat)
         df_unstacked = df_groups["ssrd"].unstack(label)
-        zero_pad = df_unstacked.iloc[0].copy().to_frame().T
-        zero_pad[:] = 0
-        zero_pad.index = zero_pad.index - pd.Timedelta("1h")
-        df_unstacked = pd.concat([zero_pad, df_unstacked], axis=0)
-        df_instant_flux = df_unstacked.diff().dropna()
-        df_instant_flux.index -= pd.Timedelta("1h")
+        df_instant_flux = instant_flux_from_cumul(df_unstacked)
         return df_instant_flux
 
-    def calculate_mean_group_value(self, masks, names, label, da_value):
-        """Group the data by the masks and calculate the mean value for each group.
-
-        Parameters
-        ----------
-        masks : xr.DataArray
-            The masks to group the data.
-            Must have the same dimensions longitude and Latitude
-            as the data.
-        names : list[str]
-            The names of the groups.
-        label : str
-            the name of the column to use for the groups.
-        da_value : xr.DataArray
-            The data to group.
-
-        Returns
-        -------
-        pd.DataFrame
-            The mean value for each group.
-        """
-        da_france = da_value.sel(
-        longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
-        )
-        try :
-            da_groups = da_france.groupby(masks).mean(["latitude", "longitude"])
-        except ValueError:
-            da_groups = da_france.groupby(masks).mean("stacked_longitude_latitude")
-        # relabel the regions groups
-        da_groups["group"] = names
-        # change the name of the groups
-        da_groups = da_groups.rename(group=label)
-        df_groups = da_groups.to_dataframe()
-        df_groups = df_groups.set_index("valid_time", append=True)
-        df_groups = df_groups.droplevel("step")
-        return df_groups
+    
     
     def mask_wind(self, masks, names, label):
         """Compute the mean wind speed for each region of France.
@@ -291,7 +245,7 @@ class ArpegeSimpleAPI():
             The mean wind speed for each region of France.
         """
         da_wind = self.read_wind().si10
-        df_groups = self.calculate_mean_group_value(masks, names, label, da_wind)
+        df_groups = calculate_mean_group_value(masks, names, label, da_wind, self.min_lon, self.max_lon, self.min_lat, self.max_lat)
         df_unstacked = df_groups["si10"].unstack(label)
         return df_unstacked
 
@@ -521,6 +475,100 @@ def download_historical_forecasts(s3_key,
             list_files.append(filename)
     return list_files
 
+def calculate_mean_group_value(masks, names, label, da_value, min_lon, max_lon, min_lat, max_lat):
+        """Group the data by the masks and calculate the mean value for each group.
+
+        Parameters
+        ----------
+        masks : xr.DataArray
+            The masks to group the data.
+            Must have the same dimensions longitude and Latitude
+            as the data.
+        names : list[str]
+            The names of the groups.
+        label : str
+            the name of the column to use for the groups.
+        da_value : xr.DataArray
+            The data to group.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean value for each group.
+        """
+        was_valid_time = "valid_time" in da_value.coords
+        if was_valid_time:
+            # remove the valid_time dimension
+            # as it can be recomputed from the time and step
+            # and it breaks the groupby
+            da_value = da_value.drop("valid_time")
+            
+        da_france = da_value.sel(
+        longitude=slice(min_lon, max_lon), latitude=slice(max_lat, min_lat)
+        )
+        try :
+            da_groups = da_france.groupby(masks).mean(["latitude", "longitude"])
+        except ValueError:
+            da_groups = da_france.groupby(masks).mean("stacked_longitude_latitude")
+        # relabel the regions groups
+        da_groups["group"] = names
+        # change the name of the groups
+        da_groups = da_groups.rename(group=label)
+        da_groups.coords["valid_time"] = da_value.coords["time"] + da_value.coords["step"]
+        df_groups = da_groups.to_dataframe()
+        df_groups = df_groups.set_index("valid_time", append=True)
+        df_groups = df_groups.droplevel("step")
+        return df_groups
+
+def instant_flux_from_cumul(df_unstacked):
+    """Compute the instant flux from the cumulated flux.
+    
+    This is needed as the Weather Data provide the cumul of the sun flux.
+    
+
+    Parameters
+    ----------
+    df_unstacked : pd.DataFrame
+        The DataFrame containing the cumulated flux.
+        The index must be a DatetimeIndex or MultiIndex and the columns must be the regions of France.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame containing the instant flux.
+    
+    Notes
+    -----
+    The function changes a lot if the index is a MultiIndex or not.
+    Maybe it should be split into two functions ?
+    """
+    
+    if isinstance(df_unstacked.index, pd.MultiIndex):
+        times = df_unstacked.index.get_level_values('time').unique()
+        zero_pad = pd.DataFrame(data=0,
+                                index=pd.MultiIndex.from_arrays([times,
+                                                                 times],
+                                                                names=['time', 'valid_time']),
+                                columns=df_unstacked.columns
+        )
+    else:
+        zero_pad = df_unstacked.iloc[0].copy().to_frame().T
+        zero_pad.index = zero_pad.index - pd.Timedelta("1h")
+        zero_pad[:] = 0
+    
+    df_unstacked = pd.concat([zero_pad, df_unstacked], axis=0)
+    if isinstance(df_unstacked.index, pd.MultiIndex):
+        df_unstacked = df_unstacked.sort_index(level=["time", "valid_time"])
+    else:
+        df_unstacked = df_unstacked.sort_index()
+    df_instant_flux = df_unstacked.diff().dropna()
+    if isinstance(df_instant_flux.index, pd.MultiIndex):
+        df_instant_flux.index = df_instant_flux.index.set_levels(df_instant_flux.index.levels[1] - pd.Timedelta("1h"),
+                                                                 level=1
+        )
+    else:
+        df_instant_flux.index -= pd.Timedelta("1h")
+    return df_instant_flux
 
 if __name__ == "__main__":
     logger.info("Fetching data for today")

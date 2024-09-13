@@ -39,7 +39,9 @@ dependencies = [
   "geojson",
   "shapely",
   "tqdm",
-  "dask",
+  "dask[distributed]",
+  "bokeh>=3.4",
+  "joblib",
 ]
 
 [project.urls]
@@ -51,11 +53,13 @@ Source = "https://github.com/GreenForecast-Squad/energetic-stress-production"
 path = "src/energy_forecast/__init__.py"
 
 [tool.hatch.envs.default]
-installer = "uv"
+installer = "pip"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
+  "pandas-stubs",
+  "joblib-stubs",
 ]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/energy_forecast tests}"
@@ -103,3 +107,14 @@ exclude_lines = [
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
+
+[tool.mypy]
+[[tool.mypy.overrides]]
+module = [
+    "shapely",
+    "shapely.geometry",
+    "shapely.plotting",
+    "geojson",
+    "sklearn",
+]
+ignore_missing_imports = true
