@@ -35,7 +35,6 @@ dependencies = [
   "eccodes",
   "cfgrib",
   "requests",
-  "statsmodels",
   "geojson",
   "shapely",
   "tqdm",
@@ -80,7 +79,7 @@ build = "sphinx-build -b html doc/ doc/_build"
 [tool.hatch.envs.serve]
 extra-dependencies = [
   "streamlit",
-  "streamlit-analytics2",
+  # "streamlit-analytics2",
 ]
 
 [tool.hatch.envs.serve.scripts]
