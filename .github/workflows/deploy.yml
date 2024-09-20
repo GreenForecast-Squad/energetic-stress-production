@@ -33,5 +33,4 @@ jobs:
           ssh ubuntu@${{secrets.PROD_IP}} << 'EOF'
           cd ${{vars.PROD_PATH}}
           git pull
-          git lfs pull
           EOF
