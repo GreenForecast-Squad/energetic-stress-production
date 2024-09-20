@@ -168,3 +168,4 @@ data/silver/*.nc
 data/silver/weather_forecasts/*.nc
 data/geo/*.nc
 .vscode/settings.json
+data/bronze/observations/*.csv.gz

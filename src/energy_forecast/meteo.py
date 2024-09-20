@@ -570,6 +570,79 @@ def instant_flux_from_cumul(df_unstacked):
         df_instant_flux.index -= pd.Timedelta("1h")
     return df_instant_flux
 
+
+def download_observations(url, filename):
+    """Download the observations from the url and save it in the filename.
+
+    Parameters
+    ----------
+    url : str
+        the url to download the data.
+    filename : str
+        the filename to save the data.
+    """
+    response = requests.get(url)
+    response.raise_for_status()
+    with open(filename, "wb") as f:
+        f.write(response.content)
+
+def download_observations_all_departments(cache_duration="12h",
+                                          file_type="latest-2023-2024_RR-T-Vent",
+                                          verbose=False):
+    """Download the temperature for each department of France."""
+    url_template = "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_{DEP_ID:0>2}_{file_type}.csv.gz"
+    list_files = []
+    download_root = ROOT_DIR / "data/bronze/observations"
+    download_root.mkdir(parents=True, exist_ok=True)
+    now = pd.Timestamp("now")
+    for dep_id in range(1, 96):
+        url = url_template.format(DEP_ID=dep_id, file_type=file_type)
+        filename = download_root / "Q_{DEP_ID:0>2}_{file_type}.csv.gz".format(DEP_ID=dep_id, file_type=file_type)
+        try:
+            if filename.exists():
+                modification_time = pd.Timestamp(filename.stat().st_mtime, unit="s")
+                if now - modification_time < pd.Timedelta(cache_duration):
+                    list_files.append(filename)
+                    continue
+            if verbose:
+                logger.info(f"Downloading {url} to {filename}")
+            download_observations(url, filename)
+            list_files.append(filename)
+        except requests.exceptions.HTTPError:
+            logger.warning(f"Could not download {url}")
+    return list_files
+
+def aggregates_observations(list_files, cut_before="2022-01-01", verbose=False):
+    """Aggregate the observations for each department of France.
+
+    Parameters
+    ----------
+    list_files : list[str]
+        the list of the files to aggregate.
+
+    Returns
+    -------
+    pd.DataFrame
+        the DataFrame containing the observations for each department.
+    """
+    all_deps = []
+    for i, file_name in enumerate(list_files):
+        if verbose:
+            logger.info(f"Reading {file_name} ({i+1}/{len(list_files)})")
+        tem_df = pd.read_csv(file_name, sep=";", usecols=["AAAAMMJJ", "TM"], compression="gzip", date_format="%Y%m%d", parse_dates=["AAAAMMJJ"])
+        
+        tem_df = (tem_df.set_index("AAAAMMJJ")
+                  .dropna(subset=["TM"])
+                  .sort_index()
+        )
+        tem_df = (tem_df
+                  .groupby(tem_df.index).mean()
+                  
+        )[cut_before:]
+        all_deps.append(tem_df)
+        
+    return pd.concat(all_deps, axis=1).mean(axis=1)
+        
 if __name__ == "__main__":
     logger.info("Fetching data for today")
     warm_cache(logger)
