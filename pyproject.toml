@@ -54,6 +54,9 @@ path = "src/energy_forecast/__init__.py"
 [tool.hatch.envs.default]
 installer = "pip"
 
+[tool.hatch.envs.default.scripts]
+tempo_prediction = "python scripts/tempo_prediction.py"
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
@@ -115,5 +118,6 @@ module = [
     "shapely.plotting",
     "geojson",
     "sklearn",
+    "energy_forecast",
 ]
 ignore_missing_imports = true
