@@ -66,15 +66,15 @@ class TempoPredictor:
     >>> r = TempoPredict(data)
     >>> r.predict()
     """
-    prevision_consumtion_f = "Prévision_J-1"
-    production_solar_f = "Solaire"
-    production_eolien_f = "Eolien"
-    production_nette_f = "Production_nette"
+    prevision_consumtion_f = "consommation"
+    production_solar_f = "solaire"
+    production_eolien_f = "eolien"
+    production_nette_f = "production_nette"
     known_jour_tempo_f = "Type_de_jour_TEMPO"
-    production_normed_f = "Production_norm"
-    production_nette_q40_f = "Production_nette_q40"
-    production_nette_q80_f = "Production_nette_q80"
-    mean_temp_q30_f = "Mean_temp_q30"
+    production_normed_f = "production_norm"
+    production_nette_q40_f = "production_nette_q40"
+    production_nette_q80_f = "production_nette_q80"
+    mean_temp_q30_f = "mean_temp_q30"
 
     def __init__(self, data: pd.DataFrame):
         """Initialize the class.
@@ -115,6 +115,9 @@ class TempoPredictor:
             (self.data[self.production_nette_q80_f] - self.data[self.production_nette_q40_f]) * np.exp(self.gamma * (self.kappa - self.data[self.mean_temp_q30_f]))
             )
         self.categories: DataFrame = pd.get_dummies(data[self.known_jour_tempo_f]).astype(int)
+        for tempo_type in ["BLEU", "BLANC", "ROUGE"]:
+            if tempo_type not in self.categories.columns:
+                self.categories[tempo_type] = 0
         self.start_BLANC = 43
         self.start_ROUGE = 22
         self.start_blanc_rouge = self.start_BLANC + self.start_ROUGE
@@ -137,12 +140,12 @@ class TempoPredictor:
         )
         self.data.loc[ self.data["stock_rouge"] == 0  ,"seuil_rouge"] = 2
 
-        data["seuil_blanc_rouge"] = (
+        self.data["seuil_blanc_rouge"] = (
             self.A_blanc_rouge
             + self.B_blanc_rouge * (data["jour_tempo"] - 1)
             + self.C_blanc_rouge * data["stock_blanc_rouge"]
         )
-        data.loc[ data["stock_blanc_rouge"] == 0  ,"seuil_blanc_rouge"] = 2
+        self.data.loc[ data["stock_blanc_rouge"] == 0  ,"seuil_blanc_rouge"] = 2
 
     def predict(self):
         """Predict the tempo signal for the next day.

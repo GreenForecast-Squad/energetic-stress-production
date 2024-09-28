@@ -5,10 +5,10 @@ from pathlib import Path
 import pandas as pd
 import requests
 import xarray as xr
-from joblib import Memory
-from .constants import departement_names, region_names, france_bounds
+from energy_forecast.constants import departement_names, region_names, france_bounds
 from energy_forecast import ROOT_DIR
 from energy_forecast.geography import get_mask_departements, get_mask_regions
+from energy_forecast.performances import memory
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -251,7 +251,6 @@ class ArpegeSimpleAPI():
 
 
 
-memory = Memory("/tmp/cache/energy_forecast", verbose=0)
 
 @memory.cache
 def get_region_sun(date: str)->pd.DataFrame:
