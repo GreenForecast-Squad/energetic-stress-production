@@ -83,7 +83,7 @@ def compute_our_enr_forecast():
     sun_forecast = fetch_mf_sun_forecast()
     wind_forecast = fetch_mf_wind_forecast()
 
-    model = ENRProductionModel.load()
+    model = ENRProductionModel.load(filename="model_departements.pkl")
     our_enr_forecast = model.predict(sun_flux=sun_forecast, wind_speed=wind_forecast)
     our_enr_forecast = our_enr_forecast.rename(
         columns={
