@@ -10,6 +10,7 @@ with hatch:
 
 import logging
 import pandas as pd
+import dotenv
 
 from energy_forecast import ROOT_DIR
 from energy_forecast.consumption_forecast import PredictionForecastAPI
@@ -23,6 +24,8 @@ from energy_forecast.performances import memory, expires_after
 logger = logging.getLogger(__name__)
 TODAY = pd.Timestamp.now().date()
 gold_dir = ROOT_DIR / "data" / "gold"
+envfile = ROOT_DIR / ".env"
+dotenv.load_dotenv(envfile)
 
 if not gold_dir.exists():
     gold_dir.mkdir()
@@ -52,7 +55,6 @@ def fetch_ret_consumption_forecast():
     However, the short term forecast is only available for the next 2 days (D-1 and D-2).
     Hence a merge with the weekly forecast is needed.
 
-    TODO : also include the historical data to compute the rolling quantiles
     """
 
     client = PredictionForecastAPI()
@@ -89,6 +91,8 @@ def compute_our_enr_forecast():
             "wind": "eolien",
         }
     )
+    # cleanup
+    # upload to glacier archive
     return our_enr_forecast.tz_localize("UTC")
 
 @memory.cache(cache_validation_callback=expires_after(days=1))

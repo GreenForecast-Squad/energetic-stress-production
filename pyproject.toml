@@ -41,6 +41,7 @@ dependencies = [
   "dask[distributed]",
   "bokeh>=3.4",
   "joblib",
+  "python-dotenv",
 ]
 
 [project.urls]
