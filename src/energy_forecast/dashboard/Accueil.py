@@ -5,7 +5,8 @@ import pandas as pd
 from energy_forecast import ROOT_DIR
 import locale
 import numpy as np
-
+import logging
+logger = logging.getLogger(__name__)
 try :
     locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')
 except locale.Error:
