@@ -45,9 +45,6 @@ if __name__ == "__main__":
         page_title="Prévision ENR",
         page_icon="🌞",
     )
-
-
-    
         
     st.title("🌞Calendier des jours Tempo❄️")
     st.markdown("Voici le calendrier des jours Tempo prédits par notre modèle et les jours Tempo réels selectionés par RTE.")
@@ -91,3 +88,32 @@ Il est divisé en trois sections:
 - Une fois la prévision de production et de consommation obtenue, la <a href="#2b45dae7" target = "_self">prévision Tempo</a> est calculée.
 """
     , unsafe_allow_html=True)
+    
+    # add section with a form so that the user can subscribe to newletter
+    st.markdown("""## Souscrire à notre newsletter
+Ce projet est encore en déveloopement et nous ajoutons de nouvelles fonctionnalités régulièrement.
+
+Vous voulez être informé des nouvelles fonctionnalités de cette application?
+Remplissez le formulaire ci-dessous pour vous inscrire à notre newsletter.""")
+    with st.form(key="newsletter"):
+        email = st.text_input("Votre adresse email")
+        rgpd = st.checkbox("J'accepte que mes données soient utilisées pour m'envoyer des emails d'information (promis, pas de spams). "
+                           "Aucune donnée ne sera partagée avec des tiers. "
+                           "Vous pouvez vous désinscrire à tout moment. "
+                           "Aucune publicité ne vous sera envoyée (parce que personne n'aime ça). "
+                           "Les données seront stockées de manière sécurisée (si bien qu'il est problable qu'on en perde nous même l'accès). ")
+        st.form_submit_button("Souscrire")
+    
+    # Store the email in the database
+    if rgpd and email:
+        from energy_forecast.dashboard.emails import store_email
+        store_email(email)
+        st.success(f"Merci pour votre inscription à notre newsletter.")
+    elif rgpd and not email:
+        st.error("Veuillez renseigner votre adresse email.")
+    elif email and not rgpd:
+        st.error("Vous devez accepter les conditions pour vous inscrire à la newsletter.")
+    
+    st.markdown("""## Contact
+Pour toute question ou suggestion, n'hésitez pas à nous contacter à l'adresse suivante: contact@antoinetavant.fr""")
+
