@@ -1,4 +1,5 @@
 
+import logging
 import numpy as np
 import pandas as pd
 import requests
@@ -6,6 +7,7 @@ from pandas import DataFrame
 
 from energy_forecast.rte_api_core import RTEAPROAuth2
 
+logger = logging.getLogger(__name__)
 
 class TempoSignalAPI(RTEAPROAuth2):
     """Class to interact with the Tempo Signal API from RTE.
@@ -64,12 +66,15 @@ class TempoPredictor:
     >>> r = TempoPredict(data)
     >>> r.predict()
     """
-    prevision_consumtion_f = "Prévision_J-1"
-    production_solar_f = "Solaire"
-    production_eolien_f = "Eolien"
-    production_nette_f = "Production_nette"
+    prevision_consumtion_f = "consommation"
+    production_solar_f = "solaire"
+    production_eolien_f = "eolien"
+    production_nette_f = "production_nette"
     known_jour_tempo_f = "Type_de_jour_TEMPO"
-    production_normed_f = "Production_norm"
+    production_normed_f = "production_norm"
+    production_nette_q40_f = "production_nette_q40"
+    production_nette_q80_f = "production_nette_q80"
+    mean_temp_q30_f = "mean_temp_q30"
 
     def __init__(self, data: pd.DataFrame):
         """Initialize the class.
@@ -83,21 +88,36 @@ class TempoPredictor:
             - Solaire : the solar production (forecasted)
             - Eolien : the wind production (forecasted)
             - Type_de_jour_TEMPO : the known tempo signal (used for the training and stock calculation)
+            Optional columns:
+            - Production_nette : the net production (forecasted)
+            - Production_nette_q40 : the 40th percentile of the net production
+            - Production_nette_q80 : the 80th percentile of the net production
+            - Mean_temp_q30 : the 30th percentile of the temperature
 
         Note
         ----
         The data should start from the 1st of September, and last one year.
         """
         self.data: DataFrame = data
-        self.data[self.production_nette_f] = self.data[self.prevision_consumtion_f] - (self.data[self.production_eolien_f] + self.data[self.production_solar_f])
-
-        self.q80 = data[self.production_nette_f].quantile(0.8)  # TODO : should instead be computed on rolling window of 1 year, using data from previous season
-        self.q40 = data[self.production_nette_f].quantile(0.4)  # TODO : should instead be computed on rolling window of 1 year, using data from previous season
-        self.qtemp30 = 9  # TODO : should instead be computed on rolling window of 1 year, using data from previous season of the 30th percentile of the temperature
+        if self.production_nette_f not in self.data.columns:
+            self.data[self.production_nette_f] = self.data[self.prevision_consumtion_f] - (self.data[self.production_eolien_f] + self.data[self.production_solar_f])
+        if self.production_nette_q40_f not in self.data.columns:
+            logger.warning("The 40th percentile of the net production is not in the data. It will be computed.")
+            self.data[self.production_nette_q40_f] = self.data[self.production_nette_f].quantile(0.4)
+        if self.production_nette_q80_f not in self.data.columns:
+            self.data[self.production_nette_q80_f] = self.data[self.production_nette_f].quantile(0.8)
+        if self.mean_temp_q30_f not in self.data.columns:
+            logger.warning("The 30th percentile of the temperature is not in the data. It will assumed 9°C.")
+            self.data[self.mean_temp_q30_f] = 9
         self.gamma = -0.1176
         self.kappa = 8.3042
-        self.data[self.production_normed_f] = (self.data[self.production_nette_f] - self.q40) / ( (self.q80 - self.q40) * np.exp(self.gamma * (self.kappa - self.qtemp30)))
+        self.data[self.production_normed_f] = (self.data[self.production_nette_f] - self.data[self.production_nette_q40_f]) / (
+            (self.data[self.production_nette_q80_f] - self.data[self.production_nette_q40_f]) * np.exp(self.gamma * (self.kappa - self.data[self.mean_temp_q30_f]))
+            )
         self.categories: DataFrame = pd.get_dummies(data[self.known_jour_tempo_f]).astype(int)
+        for tempo_type in ["BLEU", "BLANC", "ROUGE"]:
+            if tempo_type not in self.categories.columns:
+                self.categories[tempo_type] = 0
         self.start_BLANC = 43
         self.start_ROUGE = 22
         self.start_blanc_rouge = self.start_BLANC + self.start_ROUGE
@@ -115,17 +135,17 @@ class TempoPredictor:
 
         self.data["seuil_rouge"] = (
             self.A_rouge
-            + self.B_rouge * ( data["jour_tempo"] -1 )
+            + self.B_rouge * ( data["jour_tempo"] -1 )  # Not sur if start from 0 or 1
             + self.C_rouge * data["stock_rouge"]
         )
         self.data.loc[ self.data["stock_rouge"] == 0  ,"seuil_rouge"] = 2
 
-        data["seuil_blanc_rouge"] = (
+        self.data["seuil_blanc_rouge"] = (
             self.A_blanc_rouge
             + self.B_blanc_rouge * (data["jour_tempo"] - 1)
             + self.C_blanc_rouge * data["stock_blanc_rouge"]
         )
-        data.loc[ data["stock_blanc_rouge"] == 0  ,"seuil_blanc_rouge"] = 2
+        self.data.loc[ data["stock_blanc_rouge"] == 0  ,"seuil_blanc_rouge"] = 2
 
     def predict(self):
         """Predict the tempo signal for the next day.

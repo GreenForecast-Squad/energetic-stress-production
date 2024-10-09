@@ -30,11 +30,11 @@ class PredictionForecast(TypedDict):
 class PredictionForecastAPI(RTEAPROAuth2):
     """Access the RTE API to get the weekly forecast of consumption."""
 
-    url_api = "https://digital.iservices.rte-france.com/open_api/consumption/v1/weekly_forecasts"
+    url_api_weekly = "https://digital.iservices.rte-france.com/open_api/consumption/v1/weekly_forecasts"
+    url_api_short = "https://digital.iservices.rte-france.com/open_api/consumption/v1/short_term"
 
 
-
-    def get_raw_data(self,
+    def get_weekly_json(self,
                      start_date: str | pd.Timestamp |None=None,
                      end_date: str | pd.Timestamp|None=None,
                      horizon="1w") -> PredictionForecast:
@@ -61,6 +61,21 @@ class PredictionForecastAPI(RTEAPROAuth2):
             "start_date": self.format_date(start_date),
             "end_date": self.format_date(end_date),
         }
+        self.url_api = self.url_api_weekly
+        req = self.fetch_response(params)
+        return req.json()
+    
+    def get_short_term_json(self,
+                            start_date: str | pd.Timestamp |None=None,
+                            end_date: str | pd.Timestamp|None=None,
+                            horizon="3d",
+    ):
+        start_date, end_date = self.check_start_end_dates(start_date, end_date, horizon)
+        params = {
+            "start_date": self.format_date(start_date),
+            "end_date": self.format_date(end_date),
+        }
+        self.url_api = self.url_api_short
         req = self.fetch_response(params)
         return req.json()
 
@@ -88,7 +103,7 @@ class PredictionForecastAPI(RTEAPROAuth2):
         - :py:meth:`format_weekly_data`
 
         """
-        raw_json = self.get_raw_data(start_date, end_date)
+        raw_json = self.get_weekly_json(start_date, end_date)
         return self.format_weekly_data(raw_json)
 
     def format_weekly_data(self, json_data: PredictionForecast) -> pd.DataFrame:
@@ -114,6 +129,19 @@ class PredictionForecastAPI(RTEAPROAuth2):
             for pred in day_data["values"]:
                 values[pred["start_date"]] = {"predicted_consumption":pred["value"],
                                               "predicted_at": day_data["updated_date"]}
+
+        data = pd.DataFrame.from_dict(values, orient="index")
+        data.index = pd.to_datetime(data.index)
+        data["predicted_at"] = pd.to_datetime(data["predicted_at"])
+
+        data.index.name = "time"
+        return data.sort_index()
+
+    def format_short_term_data(self, json_data: dict) -> pd.DataFrame:
+        values = {}
+        for pred in json_data["values"]:
+            values[pred["start_date"]] = {"predicted_consumption":pred["value"],
+                                          "predicted_at": json_data["updated_date"]}
 
         data = pd.DataFrame.from_dict(values, orient="index")
         data.index = pd.to_datetime(data.index)

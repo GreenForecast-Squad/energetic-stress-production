@@ -5,8 +5,10 @@ from pathlib import Path
 import pandas as pd
 import requests
 import xarray as xr
-import yaml
-from joblib import Memory
+from energy_forecast.constants import departement_names, region_names, france_bounds
+from energy_forecast import ROOT_DIR
+from energy_forecast.geography import get_mask_departements, get_mask_regions
+from energy_forecast.performances import memory
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -26,11 +28,8 @@ KEYS_FILTER_T2M = {
     "cfVarName": "t2m",
 }
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-GEO_DIR = PROJECT_ROOT / "data" / "geo"
+GEO_DIR = ROOT_DIR / "data" / "geo"
 bounds_file = GEO_DIR / "france_bounds.yml"
-region_name_file = GEO_DIR / "regions_name.yml"
-region_mask_file = GEO_DIR / "mask_france_regions.nc"
 
 
 class ArpegeSimpleAPI():
@@ -71,19 +70,14 @@ class ArpegeSimpleAPI():
     def __init__(self,
                  date=pd.Timestamp("today").strftime("%Y-%m-%d"),
                  time="00:00:00",
-                 prefix="/tmp/arpege"):
+                 prefix="/tmp/arpege",):
         self.date = date
         self.time = time
         self.prefix = prefix
-        with open(bounds_file, "r") as f:
-            bounds = yaml.safe_load(f)
-        self.min_lon = bounds["min_lon"]
-        self.max_lon = bounds["max_lon"]
-        self.min_lat = bounds["min_lat"]
-        self.max_lat = bounds["max_lat"]
-        with open(region_name_file, "r") as f:
-            self.regions_names = yaml.safe_load(f)
-        self.masks = xr.load_dataarray(region_mask_file)
+        self.min_lon = france_bounds["min_lon"]
+        self.max_lon = france_bounds["max_lon"]
+        self.min_lat = france_bounds["min_lat"]
+        self.max_lat = france_bounds["max_lat"]
 
     def get_url(self, forecast_horizon):
         """Format the URL to fetch the data."""
@@ -143,7 +137,8 @@ class ArpegeSimpleAPI():
                                backend_kwargs={"filter_by_keys": keys_filter},
                                )
 
-    def read_files_as_xarray(self, list_files, keys_filter):
+    @staticmethod
+    def read_files_as_xarray(list_files, keys_filter):
         """Read all the files as an xarray dataset and concatenate them along the step dimension.
 
         Parameters
@@ -158,10 +153,10 @@ class ArpegeSimpleAPI():
         xr.Dataset
             the dataset containing the weather forecast data.
         """
-        list_xr = []
-        for filename in list_files:
-            list_xr.append(self.read_file_as_xarray(filename, keys_filter))
-        return xr.concat(list_xr, dim="step")
+        return xr.open_mfdataset(list_files,
+                                 engine="cfgrib",
+                                 backend_kwargs={"filter_by_keys": keys_filter},
+                                 )        
 
     def read_sspd(self):
         """Fetch the data and read the solar radiation.
@@ -186,6 +181,46 @@ class ArpegeSimpleAPI():
         return self.read_files_as_xarray(list_files, KEYS_FILTER_WIND)
 
     def region_sun(self):
+        """Return the mean sun flux for each region of France.
+        
+        Returns
+        -------
+        pd.DataFrame
+            The mean sun flux for each region of France
+        """
+        return self.mask_sun(get_mask_regions(), region_names, "region")
+    
+    def departement_sun(self):
+        """Return the mean sun flux for each department of France.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean sun flux for each department of France
+        """
+        return self.mask_sun(get_mask_departements(), departement_names, "departement")
+    
+    def region_wind(self):
+        """Return the mean wind speed for each region of France.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean wind speed for each region of France
+        """
+        return self.mask_wind(get_mask_regions(), region_names, "region")
+    
+    def departement_wind(self):
+        """Return the mean wind speed for each department of France.
+        
+        Returns
+        -------
+        pd.DataFrame
+            The mean wind speed for each department of France
+        """
+        return self.mask_wind(get_mask_departements(), departement_names, "departement")
+    
+    def mask_sun(self, masks, names, label):
         """Compute the mean sun flux for each region of France.
 
         Returns
@@ -194,31 +229,14 @@ class ArpegeSimpleAPI():
             The mean sun flux for each region of France.
         """
         da_sun = self.read_sspd().ssrd
-        da_sun_france = da_sun.sel(
-        longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
-        )
-        try :
-            da_sun_region = da_sun_france.groupby(self.masks).mean(["latitude", "longitude"])
-        except ValueError:
-            da_sun_region = da_sun_france.groupby(self.masks).mean("stacked_longitude_latitude")
-        # relabel the regions groups
-        da_sun_region["group"] = self.regions_names
-        # change the name of the groups
-        da_sun_region = da_sun_region.rename(group="region")
-        df_sun_regions = da_sun_region.to_dataframe()
-        df_sun_regions = df_sun_regions.set_index("valid_time", append=True)
-        df_sun_regions = df_sun_regions.droplevel("step")
-        df_unstacked = df_sun_regions["ssrd"].unstack("region")
-
-        zero_pad = df_unstacked.iloc[0].copy().to_frame().T
-        zero_pad[:] = 0
-        zero_pad.index = zero_pad.index - pd.Timedelta("1h")
-        df_unstacked = pd.concat([zero_pad, df_unstacked], axis=0)
-        df_instant_flux = df_unstacked.diff().dropna()
-        df_instant_flux.index -= pd.Timedelta("1h")
+        df_groups = calculate_mean_group_value(masks, names, label, da_sun, self.min_lon, self.max_lon, self.min_lat, self.max_lat)
+        df_unstacked = df_groups["ssrd"].unstack(label)
+        df_instant_flux = instant_flux_from_cumul(df_unstacked)
         return df_instant_flux
 
-    def region_wind(self):
+    
+    
+    def mask_wind(self, masks, names, label):
         """Compute the mean wind speed for each region of France.
 
         Returns
@@ -227,27 +245,12 @@ class ArpegeSimpleAPI():
             The mean wind speed for each region of France.
         """
         da_wind = self.read_wind().si10
-        da_wind_france = da_wind.sel(
-        longitude=slice(self.min_lon, self.max_lon), latitude=slice(self.max_lat, self.min_lat)
-        )
-        try :
-            da_wind_region = da_wind_france.groupby(self.masks).mean(["latitude", "longitude"])
-        except ValueError:
-            da_wind_region = da_wind_france.groupby(self.masks).mean("stacked_longitude_latitude")
-        # relabel the regions groups
-        da_wind_region["group"] = self.regions_names
-        # change the name of the groups
-        da_wind_region = da_wind_region.rename(group="region")
-        df_wind_regions = da_wind_region.to_dataframe()
-        df_wind_regions = df_wind_regions.set_index("valid_time", append=True)
-        df_wind_regions = df_wind_regions.droplevel("step")
-        df_unstacked = df_wind_regions["si10"].unstack("region")
-
+        df_groups = calculate_mean_group_value(masks, names, label, da_wind, self.min_lon, self.max_lon, self.min_lat, self.max_lat)
+        df_unstacked = df_groups["si10"].unstack(label)
         return df_unstacked
 
 
 
-memory = Memory("/tmp/cache/energy_forecast", verbose=0)
 
 @memory.cache
 def get_region_sun(date: str)->pd.DataFrame:
@@ -471,7 +474,174 @@ def download_historical_forecasts(s3_key,
             list_files.append(filename)
     return list_files
 
+def calculate_mean_group_value(masks, names, label, da_value, min_lon, max_lon, min_lat, max_lat):
+        """Group the data by the masks and calculate the mean value for each group.
 
+        Parameters
+        ----------
+        masks : xr.DataArray
+            The masks to group the data.
+            Must have the same dimensions longitude and Latitude
+            as the data.
+        names : list[str]
+            The names of the groups.
+        label : str
+            the name of the column to use for the groups.
+        da_value : xr.DataArray
+            The data to group.
+
+        Returns
+        -------
+        pd.DataFrame
+            The mean value for each group.
+        """
+        was_valid_time = "valid_time" in da_value.coords
+        if was_valid_time:
+            # remove the valid_time dimension
+            # as it can be recomputed from the time and step
+            # and it breaks the groupby
+            da_value = da_value.drop("valid_time")
+            
+        da_france = da_value.sel(
+        longitude=slice(min_lon, max_lon), latitude=slice(max_lat, min_lat)
+        )
+        try :
+            da_groups = da_france.groupby(masks).mean(["latitude", "longitude"])
+        except ValueError:
+            da_groups = da_france.groupby(masks).mean("stacked_longitude_latitude")
+        # relabel the regions groups
+        da_groups["group"] = names
+        # change the name of the groups
+        da_groups = da_groups.rename(group=label)
+        da_groups.coords["valid_time"] = da_value.coords["time"] + da_value.coords["step"]
+        df_groups = da_groups.to_dataframe()
+        df_groups = df_groups.set_index("valid_time", append=True)
+        df_groups = df_groups.droplevel("step")
+        return df_groups
+
+def instant_flux_from_cumul(df_unstacked):
+    """Compute the instant flux from the cumulated flux.
+    
+    This is needed as the Weather Data provide the cumul of the sun flux.
+    
+
+    Parameters
+    ----------
+    df_unstacked : pd.DataFrame
+        The DataFrame containing the cumulated flux.
+        The index must be a DatetimeIndex or MultiIndex and the columns must be the regions of France.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame containing the instant flux.
+    
+    Notes
+    -----
+    The function changes a lot if the index is a MultiIndex or not.
+    Maybe it should be split into two functions ?
+    """
+    
+    if isinstance(df_unstacked.index, pd.MultiIndex):
+        times = df_unstacked.index.get_level_values('time').unique()
+        zero_pad = pd.DataFrame(data=0,
+                                index=pd.MultiIndex.from_arrays([times,
+                                                                 times],
+                                                                names=['time', 'valid_time']),
+                                columns=df_unstacked.columns
+        )
+    else:
+        zero_pad = df_unstacked.iloc[0].copy().to_frame().T
+        zero_pad.index = zero_pad.index - pd.Timedelta("1h")
+        zero_pad[:] = 0
+    
+    df_unstacked = pd.concat([zero_pad, df_unstacked], axis=0)
+    if isinstance(df_unstacked.index, pd.MultiIndex):
+        df_unstacked = df_unstacked.sort_index(level=["time", "valid_time"])
+    else:
+        df_unstacked = df_unstacked.sort_index()
+    df_instant_flux = df_unstacked.diff().dropna()
+    if isinstance(df_instant_flux.index, pd.MultiIndex):
+        df_instant_flux.index = df_instant_flux.index.set_levels(df_instant_flux.index.levels[1] - pd.Timedelta("1h"),
+                                                                 level=1
+        )
+    else:
+        df_instant_flux.index -= pd.Timedelta("1h")
+    return df_instant_flux
+
+
+def download_observations(url, filename):
+    """Download the observations from the url and save it in the filename.
+
+    Parameters
+    ----------
+    url : str
+        the url to download the data.
+    filename : str
+        the filename to save the data.
+    """
+    response = requests.get(url)
+    response.raise_for_status()
+    with open(filename, "wb") as f:
+        f.write(response.content)
+
+def download_observations_all_departments(cache_duration="12h",
+                                          file_type="latest-2023-2024_RR-T-Vent",
+                                          verbose=False):
+    """Download the temperature for each department of France."""
+    url_template = "https://object.files.data.gouv.fr/meteofrance/data/synchro_ftp/BASE/QUOT/Q_{DEP_ID:0>2}_{file_type}.csv.gz"
+    list_files = []
+    download_root = ROOT_DIR / "data/bronze/observations"
+    download_root.mkdir(parents=True, exist_ok=True)
+    now = pd.Timestamp("now")
+    for dep_id in range(1, 96):
+        url = url_template.format(DEP_ID=dep_id, file_type=file_type)
+        filename = download_root / "Q_{DEP_ID:0>2}_{file_type}.csv.gz".format(DEP_ID=dep_id, file_type=file_type)
+        try:
+            if filename.exists():
+                modification_time = pd.Timestamp(filename.stat().st_mtime, unit="s")
+                if now - modification_time < pd.Timedelta(cache_duration):
+                    list_files.append(filename)
+                    continue
+            if verbose:
+                logger.info(f"Downloading {url} to {filename}")
+            download_observations(url, filename)
+            list_files.append(filename)
+        except requests.exceptions.HTTPError:
+            logger.warning(f"Could not download {url}")
+    return list_files
+
+def aggregates_observations(list_files, cut_before="2022-01-01", verbose=False):
+    """Aggregate the observations for each department of France.
+
+    Parameters
+    ----------
+    list_files : list[str]
+        the list of the files to aggregate.
+
+    Returns
+    -------
+    pd.DataFrame
+        the DataFrame containing the observations for each department.
+    """
+    all_deps = []
+    for i, file_name in enumerate(list_files):
+        if verbose:
+            logger.info(f"Reading {file_name} ({i+1}/{len(list_files)})")
+        tem_df = pd.read_csv(file_name, sep=";", usecols=["AAAAMMJJ", "TM"], compression="gzip", date_format="%Y%m%d", parse_dates=["AAAAMMJJ"])
+        
+        tem_df = (tem_df.set_index("AAAAMMJJ")
+                  .dropna(subset=["TM"])
+                  .sort_index()
+        )
+        tem_df = (tem_df
+                  .groupby(tem_df.index).mean()
+                  
+        )[cut_before:]
+        all_deps.append(tem_df)
+        
+    return pd.concat(all_deps, axis=1).mean(axis=1)
+        
 if __name__ == "__main__":
     logger.info("Fetching data for today")
     warm_cache(logger)

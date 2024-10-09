@@ -7,7 +7,7 @@ name = "energy-forecast"
 dynamic = ["version"]
 description = 'Predict the french electricity mix'
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = "MIT"
 keywords = []
 authors = [
@@ -25,7 +25,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "numpy>=1.25.0,<2.0.0",  # numpy 2.0.0 is released but not yet supported by all dependencies
+  "numpy>=2.0",
   "pandas",
   "xarray",
   "netCDF4",
@@ -35,9 +35,13 @@ dependencies = [
   "eccodes",
   "cfgrib",
   "requests",
-  "pyyaml",
-  "statsmodels",
-
+  "geojson",
+  "shapely",
+  "tqdm",
+  "dask[distributed]",
+  "bokeh>=3.4",
+  "joblib",
+  "python-dotenv",
 ]
 
 [project.urls]
@@ -48,9 +52,17 @@ Source = "https://github.com/GreenForecast-Squad/energetic-stress-production"
 [tool.hatch.version]
 path = "src/energy_forecast/__init__.py"
 
+[tool.hatch.envs.default]
+installer = "pip"
+
+[tool.hatch.envs.default.scripts]
+tempo_prediction = "python scripts/tempo_prediction.py"
+
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
+  "pandas-stubs",
+  "joblib-stubs",
 ]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/energy_forecast tests}"
@@ -71,7 +83,8 @@ build = "sphinx-build -b html doc/ doc/_build"
 [tool.hatch.envs.serve]
 extra-dependencies = [
   "streamlit",
-  "streamlit-analytics2",
+  "cartopy",
+  # "streamlit-analytics2",
 ]
 
 [tool.hatch.envs.serve.scripts]
@@ -98,3 +111,15 @@ exclude_lines = [
 
 [tool.ruff]
 extend-include = ["*.ipynb"]
+
+[tool.mypy]
+[[tool.mypy.overrides]]
+module = [
+    "shapely",
+    "shapely.geometry",
+    "shapely.plotting",
+    "geojson",
+    "sklearn",
+    "energy_forecast",
+]
+ignore_missing_imports = true

@@ -7,9 +7,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+
 
 jobs:
   deploy:
@@ -33,5 +31,4 @@ jobs:
           ssh ubuntu@${{secrets.PROD_IP}} << 'EOF'
           cd ${{vars.PROD_PATH}}
           git pull
-          git lfs pull
           EOF
