@@ -1,17 +1,20 @@
 """Landing page for the Energy Forecast dashboard."""
-import streamlit as st
-import streamlit as st
-import pandas as pd
-from energy_forecast import ROOT_DIR
+
 import locale
-import numpy as np
 import logging
+
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+from energy_forecast import ROOT_DIR
+
 logger = logging.getLogger(__name__)
-try :
-    locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')
+try:
+    locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")
 except locale.Error:
     logger.warning("Could not set locale to fr_FR.UTF-8")
-    
+
 
 gold_dir = ROOT_DIR / "data" / "gold"
 tempo_prediction_file = gold_dir / "our_tempo_prediction.csv"
@@ -38,6 +41,7 @@ map_our_signal_to_text = {
     "prediction_blanc": "Blanc",
     "prediction_rouge": "Rouge",
     "prediction_bleu": "Bleu",
+    np.nan: "Non calculée",
 }
 
 if __name__ == "__main__":
@@ -45,7 +49,7 @@ if __name__ == "__main__":
         page_title="Prévision ENR",
         page_icon="🌞",
     )
-        
+
     st.title("🌞Calendier des jours Tempo❄️")
     st.markdown("Voici le calendrier des jours Tempo prédits par notre modèle et les jours Tempo réels selectionés par RTE.")
     today = pd.Timestamp.now().floor("D")
@@ -60,7 +64,9 @@ if __name__ == "__main__":
     # Create a DataFrame to hold the data for the table
     table_data = {
         "Date": predictions.index.strftime("%a %d %B %Y"),
-        "Notre prévision": [map_our_signal_to_text[pred] for pred in predictions["our_tempo"]],
+        "Notre prévision à J-1": [map_our_signal_to_text[pred] for pred in predictions["our_tempo_J-1"]],
+        "Notre prévision à J-2": [map_our_signal_to_text[pred] for pred in predictions["our_tempo_J-2"]],
+        "Notre prévision à J-3": [map_our_signal_to_text[pred] for pred in predictions["our_tempo_J-3"]],
         "Valeur réelle": [map_rte_signal_to_text[true_val] for true_val in predictions["Type_de_jour_TEMPO"]],
     }
 
@@ -76,8 +82,9 @@ if __name__ == "__main__":
 
     # Display the styled table
     st.write(styled_table_df.to_html(), unsafe_allow_html=True)
-    
-    st.markdown("""## Comment ça marche?
+
+    st.markdown(
+        """## Comment ça marche?
 Cette application est une démonstration d'une prévision énergétique simple.
 
 Il est divisé en trois sections:
@@ -86,34 +93,41 @@ Il est divisé en trois sections:
 - <a href="Production" target = "_self">Prévision de production électrique</a>: utilise la prévision météo pour estimer la production éolienne et solaire
 - <a href="Consommation" target = "_self">Prévision de consommation</a>: récupère les données de consommation prévue par RTE
 - Une fois la prévision de production et de consommation obtenue, la <a href="#2b45dae7" target = "_self">prévision Tempo</a> est calculée.
-"""
-    , unsafe_allow_html=True)
-    
+""",
+        unsafe_allow_html=True,
+    )
+
     # add section with a form so that the user can subscribe to newletter
-    st.markdown("""## Souscrire à notre newsletter
+    st.markdown(
+        """## Souscrire à notre newsletter
 Ce projet est encore en déveloopement et nous ajoutons de nouvelles fonctionnalités régulièrement.
 
 Vous voulez être informé des nouvelles fonctionnalités de cette application?
-Remplissez le formulaire ci-dessous pour vous inscrire à notre newsletter.""")
+Remplissez le formulaire ci-dessous pour vous inscrire à notre newsletter."""
+    )
     with st.form(key="newsletter"):
         email = st.text_input("Votre adresse email")
-        rgpd = st.checkbox("J'accepte que mes données soient utilisées pour m'envoyer des emails d'information (promis, pas de spams). "
-                           "Aucune donnée ne sera partagée avec des tiers. "
-                           "Vous pouvez vous désinscrire à tout moment. "
-                           "Aucune publicité ne vous sera envoyée (parce que personne n'aime ça). "
-                           "Les données seront stockées de manière sécurisée (si bien qu'il est problable qu'on en perde nous même l'accès). ")
+        rgpd = st.checkbox(
+            "J'accepte que mes données soient utilisées pour m'envoyer des emails d'information (promis, pas de spams). "
+            "Aucune donnée ne sera partagée avec des tiers. "
+            "Vous pouvez vous désinscrire à tout moment. "
+            "Aucune publicité ne vous sera envoyée (parce que personne n'aime ça). "
+            "Les données seront stockées de manière sécurisée (si bien qu'il est problable qu'on en perde nous même l'accès). "
+        )
         st.form_submit_button("Souscrire")
-    
+
     # Store the email in the database
     if rgpd and email:
         from energy_forecast.dashboard.emails import store_email
+
         store_email(email)
         st.success(f"Merci pour votre inscription à notre newsletter.")
     elif rgpd and not email:
         st.error("Veuillez renseigner votre adresse email.")
     elif email and not rgpd:
         st.error("Vous devez accepter les conditions pour vous inscrire à la newsletter.")
-    
-    st.markdown("""## Contact
-Pour toute question ou suggestion, n'hésitez pas à nous contacter à l'adresse suivante: contact@antoinetavant.fr""")
 
+    st.markdown(
+        """## Contact
+Pour toute question ou suggestion, n'hésitez pas à nous contacter à l'adresse suivante: contact@antoinetavant.fr"""
+    )
