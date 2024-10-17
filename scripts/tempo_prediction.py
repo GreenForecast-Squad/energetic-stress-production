@@ -37,8 +37,8 @@ if not gold_dir.exists():
     gold_dir.mkdir()
 
 
-@memory.cache(cache_validation_callback=expires_after(days=1))
-def fetch_history_data():
+@memory.cache(cache_validation_callback=expires_after(hours=2))
+def fetch_history_data() -> pd.DataFrame:
     """Return the history data from the eco2mix API.
 
     WARNING : the API is not very reliable and the data is not always returend.
@@ -50,7 +50,7 @@ def fetch_history_data():
     return ecomix_data_no_duplicates
 
 
-@memory.cache(cache_validation_callback=expires_after(days=1))
+@memory.cache(cache_validation_callback=expires_after(hours=2))
 def fetch_ret_consumption_forecast():
     """Fetch the consumption forecast from the RTE API.
 
@@ -81,7 +81,7 @@ def fetch_mf_wind_forecast():
     return mf_wind_deps
 
 
-@memory.cache(cache_validation_callback=expires_after(days=1))
+@memory.cache(cache_validation_callback=expires_after(hours=2))
 def compute_our_enr_forecast():
     """Predict the renewable energy production."""
     # Fetch the forecasts
@@ -101,7 +101,7 @@ def compute_our_enr_forecast():
     return our_enr_forecast.tz_localize("UTC")
 
 
-@memory.cache(cache_validation_callback=expires_after(days=1))
+@memory.cache(cache_validation_callback=expires_after(hours=2))
 def fetch_temperature():
     """Limitation : there only the observed temperature is used.
 
@@ -109,6 +109,7 @@ def fetch_temperature():
     TODO : make sure the last day is complete (the observations are not always available for the current day).
     """
     files = download_observations_all_departments()
+    cut_before = TODAY - pd.DateOffset(years=1) - pd.DateOffset(month=9, day=1)
     cut_before = TODAY - pd.DateOffset(years=1) - pd.DateOffset(month=9, day=1)
     daily_temperature = aggregates_observations(files, cut_before=cut_before).tz_localize("Europe/Paris")
     return daily_temperature
@@ -129,15 +130,19 @@ def get_all_data():
     logger.info("Merging all the data")
 
     prediction_data = pd.concat([consumption_forecast.resample("h").mean(), our_enr_forecast], axis=1).dropna()
-    all_data = pd.concat([ecomix_data.resample("h").mean(), prediction_data], axis=0)
+    all_data = pd.concat([ecomix_data.resample("h").mean(),
+                          prediction_data], axis=0)
     all_data.index = pd.to_datetime(all_data.index, utc=True).tz_convert("Europe/Paris")
     origin = all_data.index[0] + pd.DateOffset(hour=6)
     all_daily_data = all_data.resample("h").mean().resample("D", origin=origin).sum()[1:-1]
     all_daily_data.index = all_daily_data.index.floor("D")
 
-    data = pd.concat(
-        [all_daily_data, tempos["value"].rename("Type_de_jour_TEMPO"), daily_temperature.rename("temperature")], axis=1
-    )
+    data = pd.concat([
+        all_daily_data,
+        tempos["value"].rename("Type_de_jour_TEMPO"),
+        daily_temperature.rename("temperature")
+        ],
+                     axis=1)
     return data
 
 
@@ -234,4 +239,5 @@ def main():
 
 
 if __name__ == "__main__":
+    logger.info(f"{TODAY=}")
     main()

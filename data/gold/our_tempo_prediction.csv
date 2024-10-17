@@ -41,5 +41,9 @@
 2024-10-10,BLUE,prediction_bleu,prediction_bleu,prediction_bleu
 2024-10-11,BLUE,prediction_bleu,prediction_bleu,prediction_bleu
 2024-10-12,BLUE,prediction_bleu,prediction_bleu,prediction_bleu
-2024-10-13,,,prediction_bleu,prediction_bleu
-2024-10-14,,,,prediction_bleu
+2024-10-13,BLUE,prediction_bleu,prediction_bleu,prediction_bleu
+2024-10-14,BLUE,prediction_bleu,,
+2024-10-15,BLUE,prediction_bleu,,
+2024-10-16,BLUE,prediction_bleu,prediction_bleu,
+2024-10-17,,,prediction_bleu,prediction_bleu
+2024-10-18,,,,prediction_bleu
