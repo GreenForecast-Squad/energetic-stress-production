@@ -55,23 +55,30 @@ class ENRProductionModel:
         self.model_sun.fit(sun_flux_preprocessed, productions["sun"])
     
     def predict(self, sun_flux:pd.DataFrame, wind_speed:pd.DataFrame) -> pd.DataFrame:
-        self.predictions = pd.DataFrame()
         wind_speed_preprocessed = self.pre_process_wind_speed(wind_speed)
-        self.predictions["wind"] = self.model_wind.predict(wind_speed_preprocessed)
+        wind_predictions = self.model_wind.predict(wind_speed_preprocessed)
         sun_flux_preprocessed = self.pre_process_sun_flux(sun_flux)
-        self.predictions["sun"] = self.model_sun.predict(sun_flux_preprocessed)
+        sun_predictions = self.model_sun.predict(sun_flux_preprocessed)
+        self.predictions = pd.concat([pd.Series(wind_predictions, name="wind",
+                                                index=wind_speed.index),
+                                      pd.Series(sun_predictions, name="sun",
+                                                index=sun_flux.index)], axis=1)
         return self.predictions
     
-    def save(self, path:str | Path | None=None) -> None:
+    def save(self, path:str | Path | None=None, filename="model.pkl") -> None:
         path = path or ROOT_DIR / "data" / "production_prediction"
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
-        dump(self, path / "model.pkl")
+        dump(self, path / filename)
     
     @classmethod
-    def load(cls, path:str | Path | None=None) -> "ENRProductionModel":
+    def load(cls, path:str | Path | None=None, filename="model.pkl") -> "ENRProductionModel":
         path = path or ROOT_DIR / "data" / "production_prediction"
         path = Path(path)
-        instance = load(path / "model.pkl")
+        if not path.exists():
+            raise FileNotFoundError(f"Path {path} does not exist.")
+        if path.is_dir():
+            path = path / filename
+        instance = load(path)
         return instance
     
